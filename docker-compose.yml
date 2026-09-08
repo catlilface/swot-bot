@@ -1,0 +1,113 @@
+# docker-compose для swot-bot (все микросервисы + rabbit + langfuse self-hosted)
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks: [swot]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langfuse-secret}
+    volumes:
+      - langfuse_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [swot]
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://langfuse:${POSTGRES_PASSWORD:-langfuse-secret}@postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
+      SALT: ${SALT:-change-me-salt}
+    ports:
+      - "3000:3000"
+    networks: [swot]
+
+  bot:
+    build:
+      context: .
+      dockerfile: docker/bot/Dockerfile
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks: [swot]
+
+  downloader:
+    build:
+      context: .
+      dockerfile: docker/downloader/Dockerfile
+    env_file: .env
+    volumes:
+      - swot_media:/data/media
+      - swot_artifacts:/data/artifacts
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks: [swot]
+
+  transcriber:
+    build:
+      context: .
+      dockerfile: docker/transcriber/Dockerfile
+    env_file: .env
+    volumes:
+      - swot_media:/data/media
+      - swot_artifacts:/data/artifacts
+      - whisper_cache:/data/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks: [swot]
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: docker/analyzer/Dockerfile
+    env_file: .env
+    volumes:
+      - swot_artifacts:/data/artifacts
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+    networks: [swot]
+
+volumes:
+  rabbitmq_data:
+  langfuse_pg_data:
+  swot_media:
+  swot_artifacts:
+  whisper_cache:
+
+networks:
+  swot:
+    driver: bridge

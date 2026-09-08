@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync workspace
+        run: uv sync --all-packages
+
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Tests (unit)
+        run: uv run pytest tests/unit -q
+
+      - name: Import all packages
+        run: |
+          uv run python -c "import swot_contracts, swot_observability, swot_bus, swot_bot, swot_downloader, swot_transcriber, swot_analyzer; print('imports OK')"
