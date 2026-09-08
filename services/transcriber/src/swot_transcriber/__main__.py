@@ -1,11 +1,27 @@
-"""Entry point for the transcriber service."""
+"""Entry point for the transcriber service (wires DI via dishka)."""
 
 import asyncio
 
+from dishka import make_async_container
+from swot_bus import BusProvider, RegistryProvider
+
+from .providers import TranscriberAdaptersProvider, TranscribeServiceProvider
+from .service import TranscribeService
+
 
 async def _amain() -> None:
-    # Placeholder entry point; faster-whisper wiring lands in Этап 4 (task #11).
-    print("swot-transcriber service — placeholder")
+    container = make_async_container(
+        BusProvider(),
+        RegistryProvider(),
+        TranscriberAdaptersProvider(),
+        TranscribeServiceProvider(),
+    )
+    try:
+        async with container() as request_container:
+            service = await request_container.get(TranscribeService)
+            await service.run()
+    finally:
+        await container.close()
 
 
 def main() -> None:
