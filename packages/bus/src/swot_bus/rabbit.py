@@ -24,18 +24,25 @@ JOB_EVENTS_QUEUE = "job.events"
 
 
 class RabbitMessageBus:
-    """Publish messages by msg_type; consume bound handlers."""
+    """Publish messages by msg_type; consume bound handlers.
+
+    Each instance owns one durable queue bound to the given ``routing_keys``.
+    A service configures its own queue so it receives only the events it needs
+    (e.g. downloader listens only for ``download.request``).
+    """
 
     def __init__(
         self,
         url: str,
         exchange_name: str = EXCHANGE_NAME,
         queue_name: str = RESULT_QUEUE,
+        routing_keys: list[str] | None = None,
         prefetch: int = 1,
     ) -> None:
         self._url = url
         self._exchange_name = exchange_name
         self._queue_name = queue_name
+        self._routing_keys = routing_keys or [queue_name]
         self._prefetch = prefetch
         self._connection: AbstractRobustConnection | None = None
         self._channel_pool: Pool | None = None
@@ -84,8 +91,8 @@ class RabbitMessageBus:
             raise RuntimeError(msg)
         async with self._channel_pool.acquire() as channel:
             queue = await channel.declare_queue(self._queue_name, durable=True)
-            await queue.bind(self._exchange, self._queue_name)
-            await queue.bind(self._exchange, "job.#")
+            for key in self._routing_keys:
+                await queue.bind(self._exchange, key)
             async for message in queue.iterator():
                 task = asyncio.create_task(self._dispatch(message, handler))
                 self._pending_tasks.add(task)
@@ -117,6 +124,14 @@ class RabbitMessageBus:
             await self._connection.close()
 
 
-async def open_bus(url: str, **kwargs: Any) -> RabbitMessageBus:
-    bus = RabbitMessageBus(url, **kwargs)
+async def open_bus(
+    url: str,
+    *,
+    queue_name: str = RESULT_QUEUE,
+    routing_keys: list[str] | None = None,
+    **kwargs: Any,
+) -> RabbitMessageBus:
+    bus = RabbitMessageBus(
+        url, queue_name=queue_name, routing_keys=routing_keys, **kwargs
+    )
     return await bus.connect()

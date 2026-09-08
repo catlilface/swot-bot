@@ -1,0 +1,10 @@
+<b>{{ summary.title or 'Выжимка лекции' }}</b>
+
+{{ summary.summary }}
+
+{% for section in summary.sections %}
+<b>{{ section.heading }}</b>
+{% for fact in section.facts %}
+<span class="-chrono">{{ fact.start_sec | chrono }}</span> {{ fact.text }}
+{% endfor %}
+{% endfor %}

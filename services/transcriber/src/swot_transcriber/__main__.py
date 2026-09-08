@@ -3,7 +3,7 @@
 import asyncio
 
 from dishka import make_async_container
-from swot_bus import BusProvider, RegistryProvider
+from swot_bus import RabbitBusProvider, RegistryProvider
 
 from .providers import TranscriberAdaptersProvider, TranscribeServiceProvider
 from .service import TranscribeService
@@ -11,7 +11,7 @@ from .service import TranscribeService
 
 async def _amain() -> None:
     container = make_async_container(
-        BusProvider(),
+        RabbitBusProvider("video.transcribe", ["video.downloaded"]),
         RegistryProvider(),
         TranscriberAdaptersProvider(),
         TranscribeServiceProvider(),
