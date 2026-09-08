@@ -1,0 +1,50 @@
+[project]
+name = "swot-workspace"
+version = "0.0.0"
+description = "swot-bot monorepo workspace root (uv)"
+requires-python = ">=3.13"
+dependencies = [
+    "dishka>=1.10.1",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "pre-commit>=4.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/*",
+    "services/*",
+]
+
+[tool.uv.sources]
+swot-contracts = { workspace = true }
+swot-observability = { workspace = true }
+swot-bus = { workspace = true }
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["packages", "services", "tests"]
+include = ["*.py"]
+
+extend-exclude = ["docs", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C4"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
