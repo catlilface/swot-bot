@@ -36,7 +36,7 @@ class RabbitBusProvider(Provider):
     @provide(scope=Scope.APP)
     async def bus(self, settings: Settings) -> AsyncIterable[MessageBus]:
         bus = await open_bus(
-            settings.rabbit_url,
+            settings.broker.rabbit_url,
             queue_name=self._queue_name,
             routing_keys=self._routing_keys,
             prefetch=self._prefetch,

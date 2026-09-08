@@ -69,7 +69,7 @@ class DownloaderService:
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("download failed", task_id=str(message.task_id))
+            logger.exception("download failed: task_id=%s", message.task_id)
             from swot_contracts import JobFailed
 
             await self._bus.publish(
@@ -94,9 +94,9 @@ class DownloaderService:
                         if f.is_file():
                             f.unlink(missing_ok=True)
                     child.rmdir()
-                    logger.info("cleaned artifacts", path=str(child))
+                    logger.info("cleaned artifacts: %s", child)
             except OSError as exc:
-                logger.warning("cleanup failed", path=str(child), error=str(exc))
+                logger.warning("cleanup failed: path=%s error=%s", child, exc)
 
     async def run(self, cleanup_interval: int = 3600) -> None:
         async def _cleanup_loop() -> None:

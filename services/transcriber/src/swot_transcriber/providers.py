@@ -22,12 +22,12 @@ class TranscriberAdaptersProvider(Provider):
     @provide(scope=Scope.APP)
     def transcriber(self, settings: Settings) -> Transcriber:
         return FasterWhisperTranscriber(
-            model_size=settings.whisper_model,
-            device=settings.whisper_device,
-            compute_type=settings.whisper_compute_type,
-            language=settings.whisper_language,
-            batch_size=settings.whisper_batch_size,
-            models_dir=settings.whisper_models_dir,
+            model_size=settings.transcriber.model,
+            device=settings.transcriber.device,
+            compute_type=settings.transcriber.compute_type,
+            language=settings.transcriber.language,
+            batch_size=settings.transcriber.batch_size,
+            models_dir=settings.transcriber.models_dir,
         )
 
 

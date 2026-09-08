@@ -1,0 +1,26 @@
+"""Telegram bot (AIogram) settings.
+
+Read from the environment via ``SECTION__FIELD`` vars with the ``__`` delimiter
+(``env_nested_delimiter``), e.g. ``TELEGRAM__TOKEN=123:ABC``; unset fields fall
+back to the defaults below.
+"""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class TelegramSettings(BaseSettings):
+    """AIogram bot credentials and targets for the bot service.
+
+    ``TELEGRAM__TOKEN``, ``TELEGRAM__ADMIN_ID``, ``TELEGRAM__TARGET_CHAT_ID``
+    (all optional).
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    token: str | None = None  # BotFather token
+    admin_id: int | None = None  # admin who submits links and receives results
+    target_chat_id: int | None = None  # chat where ready summaries are published

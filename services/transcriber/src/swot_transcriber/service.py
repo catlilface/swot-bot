@@ -70,7 +70,7 @@ class TranscribeService:
             await self._registry.set_status(message.task_id, JobStatus.READY)
             self._cleanup_media(message.media_path)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("transcribe failed", task_id=str(message.task_id))
+            logger.exception("transcribe failed: task_id=%s", message.task_id)
             from swot_contracts import JobFailed
 
             await self._bus.publish(
@@ -89,7 +89,7 @@ class TranscribeService:
         try:
             Path(media_path).unlink(missing_ok=True)
         except OSError as exc:
-            logger.warning("media cleanup failed", path=media_path, error=str(exc))
+            logger.warning("media cleanup failed: path=%s error=%s", media_path, exc)
 
     async def run(self) -> None:
         await self._bus.consume(self.handle)

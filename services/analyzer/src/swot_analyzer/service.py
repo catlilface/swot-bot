@@ -64,12 +64,11 @@ class AnalyzeService:
                     source=message.source,
                     base_dir=str(base_dir),
                     summary_path=str(summary_path),
-                    title=summary.title,
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("analyze failed", task_id=str(message.task_id))
+            logger.exception("analyze failed: task_id=%s", message.task_id)
             await self._registry.set_status(message.task_id, JobStatus.FAILED)
             await self._bus.publish(
                 JobFailed(
@@ -96,15 +95,11 @@ class AnalyzeService:
 
 def _summary_to_dict(summary) -> dict:
     return {
-        "title": summary.title,
         "summary": summary.summary,
         "sections": [
             {
                 "heading": s.heading,
-                "facts": [
-                    {"text": f.text, "start_sec": f.start_sec, "end_sec": f.end_sec}
-                    for f in s.facts
-                ],
+                "facts": [{"text": f.text, "start_sec": f.start_sec} for f in s.facts],
             }
             for s in summary.sections
         ],

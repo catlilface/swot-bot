@@ -67,9 +67,10 @@ class StubTranscriber:
 class StubSummarizer:
     async def summarize(self, transcript: str, prompt: str) -> Summary:
         return Summary(
-            title="Лекция",
             summary="Кратко",
-            sections=[Section(heading="Введение", facts=[Fact("Факт №1", 0, 10)])],
+            sections=[
+                Section(heading="Введение", facts=[Fact(text="Факт №1", start_sec=0)])
+            ],
         )
 
 
@@ -132,5 +133,6 @@ async def test_full_pipeline_end_to_end(tmp_path: Path) -> None:
     summary_path = Path(ready.summary_path)
     assert summary_path.exists()
     text = MessageRenderer().render(summary_path)
-    assert "Лекция" in text
+    assert "Выжимка лекции" in text  # фолбэк шаблона: title в summary.json больше нет
+    assert "Факт №1" in text
     assert "00:00" in text  # факт на 0 секунд -> MM:SS

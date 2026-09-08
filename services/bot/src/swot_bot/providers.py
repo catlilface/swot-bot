@@ -23,16 +23,16 @@ class BotHandlersProvider(Provider):
 
     @provide(scope=Scope.APP)
     def bot(self, settings: Settings) -> aiogram.Bot:
-        return aiogram.Bot(token=settings.bot_token or "")
+        return aiogram.Bot(token=settings.telegram.token or "")
 
     @provide(scope=Scope.APP)
     def router(self, settings: Settings) -> Router:
-        router, _ = build_router(settings.admin_id)
+        router, _ = build_router(settings.telegram.admin_id)
         return router
 
     @provide(scope=Scope.APP)
     def validator(self, settings: Settings) -> UrlValidator:
-        return UrlValidator(allowed_hosts=settings.allowed_sources)
+        return UrlValidator(allowed_hosts=settings.downloader.allowed_sources)
 
     @provide(scope=Scope.APP)
     def renderer(self) -> MessageRenderer:
@@ -47,7 +47,7 @@ class BotHandlersProvider(Provider):
     ) -> ResultReporter:
         return ResultReporter(
             bot=bot,
-            target_chat_id=settings.target_chat_id or 0,
+            target_chat_id=settings.telegram.target_chat_id or 0,
             renderer=renderer,
             artifacts_dir=settings.artifacts_dir,
         )

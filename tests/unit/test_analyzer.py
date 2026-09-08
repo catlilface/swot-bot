@@ -13,10 +13,11 @@ from swot_contracts import JobStatus, SourceRef, TranscriptReady
 class StubSummarizer:
     async def summarize(self, transcript: str, prompt: str) -> Summary:
         return Summary(
-            title="Лекция",
             summary="Резюме",
             sections=[
-                Section(heading="Гл1", facts=[Fact("Факт из транскрипта", 5, 12)])
+                Section(
+                    heading="Гл1", facts=[Fact(text="Факт из транскрипта", start_sec=5)]
+                )
             ],
         )
 
@@ -56,6 +57,5 @@ async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
     ready = bus.get(1)
     assert ready.msg_type.value == "analysis.ready"
     summary = load((base_dir / "summary.json").open(encoding="utf-8"))
-    assert summary["title"] == "Лекция"
     assert summary["sections"][0]["facts"][0]["start_sec"] == 5
     assert await registry.get_status(task_id) == JobStatus.READY

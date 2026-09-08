@@ -21,11 +21,11 @@ class AnalyzerAdaptersProvider(Provider):
 
     @provide(scope=Scope.APP)
     def prompt_provider(self, settings: Settings) -> PromptProvider:
-        if settings.langfuse_public_key and settings.langfuse_secret_key:
+        if settings.langfuse.public_key and settings.langfuse.secret_key:
             return LangfusePromptProvider(
-                public_key=settings.langfuse_public_key,
-                secret_key=settings.langfuse_secret_key,
-                base_url=settings.langfuse_base_url,
+                public_key=settings.langfuse.public_key,
+                secret_key=settings.langfuse.secret_key,
+                base_url=settings.langfuse.base_url,
                 fallback=self.local_prompt(),
             )
         return self.local_prompt()
@@ -33,10 +33,10 @@ class AnalyzerAdaptersProvider(Provider):
     @provide(scope=Scope.APP)
     def summarizer(self, settings: Settings) -> Summarizer:
         return LlmSummarizer(
-            base_url=settings.openai_compatible_api_url,
-            api_key=settings.openai_compatible_api_key,
-            model=settings.llm_model_id,
-            temperature=settings.llm_temperature,
+            base_url=settings.llm.api_url,
+            api_key=settings.llm.api_key,
+            model=settings.llm.model_id,
+            temperature=settings.llm.sampling_parameters.get("temperature", 0.3),
         )
 
 
@@ -53,7 +53,7 @@ class AnalyzeServiceProvider(Provider):
         registry: JobRegistry,
     ) -> AsyncIterable[AnalyzeService]:
         yield AnalyzeService(
-            prompt_name=settings.prompt_name,
+            prompt_name=settings.llm.summarization_prompt_name,
             prompt_provider=prompt_provider,
             summarizer=summarizer,
             bus=bus,
