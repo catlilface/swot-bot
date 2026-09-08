@@ -25,6 +25,4 @@ class DownloadedMedia:
 class MediaDownloader(Protocol):
     """Download a source into dst_dir and return its media location."""
 
-    async def download(
-        self, source: SourceRef, dst_dir: Path
-    ) -> DownloadedMedia: ...
+    async def download(self, source: SourceRef, dst_dir: Path) -> DownloadedMedia: ...

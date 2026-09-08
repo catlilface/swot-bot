@@ -42,7 +42,9 @@ class TranscribeService:
         try:
             work = out_dir / "work"
             work.mkdir(parents=True, exist_ok=True)
-            audio = await self._extractor.extract(Path(message.media_path), work / "audio.wav")
+            audio = await self._extractor.extract(
+                Path(message.media_path), work / "audio.wav"
+            )
             result = await self._transcriber.transcribe(audio, out_dir)
 
             from swot_contracts import TranscriptReady

@@ -55,7 +55,9 @@ class DirectHttpAdapter:
         import aiohttp
 
         dst_dir.mkdir(parents=True, exist_ok=True)
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(self._timeout)) as session:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(self._timeout)
+        ) as session:
             async with session.get(source.url) as resp:
                 resp.raise_for_status()
                 content_type = resp.headers.get("content-type", "")

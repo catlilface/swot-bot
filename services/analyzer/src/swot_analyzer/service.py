@@ -95,7 +95,10 @@ def _summary_to_dict(summary) -> dict:
         "sections": [
             {
                 "heading": s.heading,
-                "facts": [{"text": f.text, "start_sec": f.start_sec, "end_sec": f.end_sec} for f in s.facts],
+                "facts": [
+                    {"text": f.text, "start_sec": f.start_sec, "end_sec": f.end_sec}
+                    for f in s.facts
+                ],
             }
             for s in summary.sections
         ],

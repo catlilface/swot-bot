@@ -50,7 +50,9 @@ class LangfusePromptProvider:
 
         client = langfuse.get_client()
         try:
-            prompt = client.get_prompt(name, label="production", fallback=self._fallback.get(name))
+            prompt = client.get_prompt(
+                name, label="production", fallback=self._fallback.get(name)
+            )
             return prompt.get_langchain_prompt() or prompt.prompt
         except Exception:  # noqa: BLE001
             return self._fallback.get(name)

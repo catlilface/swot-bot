@@ -15,7 +15,9 @@ class StubSummarizer:
         return Summary(
             title="Лекция",
             summary="Резюме",
-            sections=[Section(heading="Гл1", facts=[Fact("Факт из транскрипта", 5, 12)])],
+            sections=[
+                Section(heading="Гл1", facts=[Fact("Факт из транскрипта", 5, 12)])
+            ],
         )
 
 

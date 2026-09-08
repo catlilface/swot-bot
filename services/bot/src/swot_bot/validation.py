@@ -7,7 +7,9 @@ class UrlValidator:
     """Accept any http(s) URL; optional host allowlist from env."""
 
     def __init__(self, allowed_hosts: str = "") -> None:
-        self._allowed = {h.strip().lower() for h in allowed_hosts.split(",") if h.strip()}
+        self._allowed = {
+            h.strip().lower() for h in allowed_hosts.split(",") if h.strip()
+        }
 
     def validate(self, url: str) -> str:
         if len(url) > 2048:

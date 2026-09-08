@@ -62,13 +62,15 @@ class FasterWhisperTranscriber:
         seg_records: list[dict] = []
         for i, seg in enumerate(segs, start=1):
             srt_lines.append(str(i))
-            srt_lines.append(
-                f"{_fmt_srt_time(seg.start)} --> {_fmt_srt_time(seg.end)}"
-            )
+            srt_lines.append(f"{_fmt_srt_time(seg.start)} --> {_fmt_srt_time(seg.end)}")
             srt_lines.append(seg.text.strip())
             srt_lines.append("")
             seg_records.append(
-                {"start": round(seg.start, 2), "end": round(seg.end, 2), "text": seg.text}
+                {
+                    "start": round(seg.start, 2),
+                    "end": round(seg.end, 2),
+                    "text": seg.text,
+                }
             )
 
         srt_path.write_text("\n".join(srt_lines), encoding="utf-8")
