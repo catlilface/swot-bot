@@ -11,6 +11,7 @@ from swot_contracts import (
     AnalysisReady,
     DownloadRequest,
     JobFailed,
+    JobProgress,
     MessageBus,
     SourceRef,
 )
@@ -21,6 +22,23 @@ from .renderer import MessageRenderer
 from .validation import UrlValidator
 
 logger = logging.getLogger(__name__)
+
+TG_MSG_LIMIT = 4096
+
+
+def _chunk_text(text: str, limit: int = TG_MSG_LIMIT) -> list[str]:
+    """Split long text to fit Telegram's 4096-char limit."""
+    if len(text) <= limit:
+        return [text]
+    chunks: list[str] = []
+    rest = text
+    while len(rest) > limit:
+        cut = rest.rfind("\n", 0, limit)
+        cut = cut if cut > 0 else limit
+        chunks.append(rest[:cut])
+        rest = rest[cut:].lstrip("\n")
+    chunks.append(rest)
+    return chunks
 
 
 def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
@@ -76,7 +94,8 @@ class ResultReporter:
 
     async def on_analysis(self, msg: AnalysisReady) -> None:
         text = self._renderer.render(Path(msg.summary_path))
-        await self._bot.send_message(self._target, text, parse_mode="HTML")
+        for part in _chunk_text(text):
+            await self._bot.send_message(self._target, part, parse_mode="HTML")
 
         srt = self._artifacts / str(msg.task_id) / "transcript.srt"
         if srt.exists():
@@ -87,6 +106,14 @@ class ResultReporter:
 
     async def on_failed(self, msg: JobFailed) -> None:
         await self._bot.send_message(self._target, f"⚠️ Задача упала: {msg.error}")
+
+    async def on_progress(self, msg: JobProgress) -> None:
+        label = {
+            "downloading": "⬇️ Скачиваю…",
+            "transcribing": "📝 Транскрибирую…",
+            "analyzing": "🧠 Анализирую…",
+        }.get(msg.stage, msg.stage)
+        await self._bot.send_message(self._target, f"{label} ({msg.stage})")
 
 
 def _kind_for(url: str) -> str:

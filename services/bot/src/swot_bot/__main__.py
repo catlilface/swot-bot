@@ -19,7 +19,9 @@ from .providers import (
 async def _amain() -> None:
     configure_logging()
     container = make_async_container(
-        RabbitBusProvider("result.deliver", ["analysis.ready", "job.failed"]),
+        RabbitBusProvider(
+            "result.deliver", ["analysis.ready", "job.failed", "job.progress"]
+        ),
         RegistryProvider(),
         ObservabilityProvider(),
         BotHandlersProvider(),

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swot_contracts import (
+    JobProgress,
     JobStatus,
     MessageBus,
     VideoDownloaded,
@@ -38,6 +39,11 @@ class TranscribeService:
 
     async def handle(self, message: VideoDownloaded) -> None:
         await self._registry.set_status(message.task_id, JobStatus.TRANSCRIBING)
+        await self._bus.publish(
+            JobProgress(
+                task_id=message.task_id, trace_id=message.trace_id, stage="transcribing"
+            )
+        )
         out_dir = self._artifacts_dir / str(message.task_id)
         try:
             work = out_dir / "work"
@@ -62,6 +68,7 @@ class TranscribeService:
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
+            self._cleanup_media(message.media_path)
         except Exception as exc:  # noqa: BLE001
             logger.exception("transcribe failed", task_id=str(message.task_id))
             from swot_contracts import JobFailed
@@ -75,6 +82,14 @@ class TranscribeService:
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.FAILED)
+
+    @staticmethod
+    def _cleanup_media(media_path: str) -> None:
+        """Remove the downloaded media once transcription is done (best-effort)."""
+        try:
+            Path(media_path).unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("media cleanup failed", path=media_path, error=str(exc))
 
     async def run(self) -> None:
         await self._bus.consume(self.handle)

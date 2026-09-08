@@ -52,7 +52,9 @@ async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
             segments_path=str(base_dir / "segments.json"),
         )
     )
-    assert bus.published_types()[0].value == "analysis.ready"
+    assert "analysis.ready" in [t.value for t in bus.published_types()]
+    ready = bus.get(1)
+    assert ready.msg_type.value == "analysis.ready"
     summary = load((base_dir / "summary.json").open(encoding="utf-8"))
     assert summary["title"] == "Лекция"
     assert summary["sections"][0]["facts"][0]["start_sec"] == 5

@@ -43,5 +43,7 @@ class DownloaderServiceProvider(Provider):
             bus=bus,
             registry=registry,
             max_duration_sec=settings.max_video_duration_sec,
+            artifacts_dir=settings.artifacts_dir,
+            retention_hours=settings.artifacts_retention_hours,
         )
         yield svc

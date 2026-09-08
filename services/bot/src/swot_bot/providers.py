@@ -5,7 +5,13 @@ from collections.abc import AsyncIterable
 import aiogram
 from aiogram import Router
 from dishka import Provider, Scope, provide
-from swot_contracts import AnalysisReady, JobFailed, MessageBus, Settings
+from swot_contracts import (
+    AnalysisReady,
+    JobFailed,
+    JobProgress,
+    MessageBus,
+    Settings,
+)
 
 from .handlers import ResultReporter, build_router
 from .renderer import MessageRenderer
@@ -60,6 +66,8 @@ class BotConsumer:
                 await self._reporter.on_analysis(message)
             elif isinstance(message, JobFailed):
                 await self._reporter.on_failed(message)
+            elif isinstance(message, JobProgress):
+                await self._reporter.on_progress(message)
 
         await self._bus.consume(handler)
 

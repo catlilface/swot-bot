@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swot_contracts import (
-    AnalysisFailed,
     AnalysisReady,
+    JobFailed,
+    JobProgress,
     JobStatus,
     MessageBus,
     TranscriptReady,
@@ -39,6 +40,11 @@ class AnalyzeService:
 
     async def handle(self, message: TranscriptReady) -> None:
         await self._registry.set_status(message.task_id, JobStatus.ANALYZING)
+        await self._bus.publish(
+            JobProgress(
+                task_id=message.task_id, trace_id=message.trace_id, stage="analyzing"
+            )
+        )
         base_dir = Path(message.base_dir)
         try:
             transcript = self._read_transcript(Path(message.srt_path))
@@ -64,15 +70,15 @@ class AnalyzeService:
             await self._registry.set_status(message.task_id, JobStatus.READY)
         except Exception as exc:  # noqa: BLE001
             logger.exception("analyze failed", task_id=str(message.task_id))
+            await self._registry.set_status(message.task_id, JobStatus.FAILED)
             await self._bus.publish(
-                AnalysisFailed(
+                JobFailed(
                     task_id=message.task_id,
                     trace_id=message.trace_id,
-                    source=message.source,
+                    stage="analyze",
                     error=str(exc),
                 )
             )
-            await self._registry.set_status(message.task_id, JobStatus.FAILED)
 
     @staticmethod
     def _read_transcript(srt: Path) -> str:

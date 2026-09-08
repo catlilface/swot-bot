@@ -39,6 +39,8 @@ async def test_transcribe_publishes_transcript_ready(tmp_path: Path) -> None:
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
     )
+    # media должен существовать до транскрипции
+    (tmp_path / "m.m4a").write_bytes(b"fake-media")
     await svc.handle(
         VideoDownloaded(
             task_id=task_id,
@@ -49,8 +51,11 @@ async def test_transcribe_publishes_transcript_ready(tmp_path: Path) -> None:
             duration_sec=2,
         )
     )
-    assert bus.published_types()[0].value == "transcript.ready"
-    ready = bus.get(0)
+    assert "transcript.ready" in [t.value for t in bus.published_types()]
+    ready = bus.get(1)
+    assert ready.msg_type.value == "transcript.ready"
     assert ready.srt_path.endswith("transcript.srt")
     assert ready.language == "ru"
     assert await registry.get_status(task_id) == JobStatus.READY
+    # media удаляется после успешной транскрипции
+    assert not (tmp_path / "m.m4a").exists()

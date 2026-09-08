@@ -1,5 +1,7 @@
 """Unit tests for the downloader service using FakeBus + dishka container."""
 
+import os
+import time
 from pathlib import Path
 from uuid import UUID
 
@@ -8,6 +10,29 @@ from swot_bus import FakeBus, InMemoryJobRegistry, RegistryProvider
 from swot_contracts import DownloadRequest, JobStatus, SourceRef
 from swot_downloader.domain import DownloadedMedia
 from swot_downloader.service import DownloaderService
+
+
+async def test_artifacts_ttl_cleanup(tmp_path: Path) -> None:
+    artifacts = tmp_path / "artifacts"
+    old = artifacts / "old"
+    fresh = artifacts / "fresh"
+    old.mkdir(parents=True)
+    fresh.mkdir(parents=True)
+    (old / "summary.json").write_text("{}", encoding="utf-8")
+    (fresh / "summary.json").write_text("{}", encoding="utf-8")
+    past = time.time() - 200 * 3600  # старше 7 дней
+    os.utime(old, (past, past))
+    svc = DownloaderService(
+        media_dir=str(tmp_path),
+        router=StubRouter(tmp_path),  # type: ignore[arg-type]
+        bus=FakeBus(),  # type: ignore[arg-type]
+        registry=InMemoryJobRegistry(),  # type: ignore[arg-type]
+        artifacts_dir=str(artifacts),
+        retention_hours=168,
+    )
+    await svc._cleanup_old_artifacts(168)
+    assert not old.exists()
+    assert fresh.exists()
 
 
 class StubRouter:
@@ -42,7 +67,10 @@ async def test_downloader_publishes_video_downloaded(tmp_path: Path) -> None:
             source=SourceRef(url="https://disk.yandex.ru/i/abc", kind="yandex_disk"),
         )
     )
-    assert bus.published_types()[0].value == "video.downloaded"
+    assert "video.downloaded" in [t.value for t in bus.published_types()]
+    ready = bus.get(1)
+    assert ready.msg_type.value == "video.downloaded"
+    assert ready.media_path.endswith("media.m4a")
     assert await registry.get_status(task_id) == JobStatus.READY
 
 
