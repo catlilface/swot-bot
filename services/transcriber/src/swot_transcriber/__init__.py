@@ -1,3 +1,3 @@
-"""Transcriber service: ffmpeg + faster-whisper (GPU) -> SRT + segments."""
+"""Transcriber service: ffmpeg + OpenAI-compatible ASR -> SRT + segments."""
 
 __version__ = "0.1.0"

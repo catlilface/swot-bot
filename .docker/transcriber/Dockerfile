@@ -12,7 +12,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM base AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 
-# faster-whisper требует CUDA runtime образ для GPU; базовый берём nvidia-совместимый
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev && \
     uv pip install --system ./packages/contracts ./packages/observability ./packages/bus ./services/transcriber --no-deps

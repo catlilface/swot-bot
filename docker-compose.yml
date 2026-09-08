@@ -46,7 +46,7 @@ services:
   bot:
     build:
       context: .
-      dockerfile: docker/bot/Dockerfile
+      dockerfile: .docker/bot/Dockerfile
     env_file: .env
     depends_on:
       rabbitmq:
@@ -61,7 +61,7 @@ services:
   downloader:
     build:
       context: .
-      dockerfile: docker/downloader/Dockerfile
+      dockerfile: .docker/downloader/Dockerfile
     env_file: .env
     volumes:
       - swot_media:/data/media
@@ -79,19 +79,11 @@ services:
   transcriber:
     build:
       context: .
-      dockerfile: docker/transcriber/Dockerfile
+      dockerfile: .docker/transcriber/Dockerfile
     env_file: .env
     volumes:
       - swot_media:/data/media
       - swot_artifacts:/data/artifacts
-      - whisper_cache:/data/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -105,7 +97,7 @@ services:
   analyzer:
     build:
       context: .
-      dockerfile: docker/analyzer/Dockerfile
+      dockerfile: .docker/analyzer/Dockerfile
     env_file: .env
     volumes:
       - swot_artifacts:/data/artifacts
@@ -126,7 +118,6 @@ volumes:
   langfuse_pg_data:
   swot_media:
   swot_artifacts:
-  whisper_cache:
 
 networks:
   swot:

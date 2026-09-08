@@ -6,14 +6,14 @@ from dishka import Provider, Scope, provide
 from swot_contracts import MessageBus, Settings
 from swot_contracts.ports import JobRegistry
 
+from .asr import FakeTranscriber, OpenaiAsrTranscriber
 from .domain import AudioExtractor, Transcriber
 from .ffmpeg import FfmpegAudioExtractor
 from .service import TranscribeService
-from .whisper import FakeTranscriber, FasterWhisperTranscriber
 
 
 class TranscriberAdaptersProvider(Provider):
-    """Real adapters: ffmpeg extractor + faster-whisper (GPU)."""
+    """Real adapters: ffmpeg extractor + OpenAI-compatible ASR endpoint."""
 
     @provide(scope=Scope.APP)
     def extractor(self) -> AudioExtractor:
@@ -21,13 +21,11 @@ class TranscriberAdaptersProvider(Provider):
 
     @provide(scope=Scope.APP)
     def transcriber(self, settings: Settings) -> Transcriber:
-        return FasterWhisperTranscriber(
-            model_size=settings.transcriber.model,
-            device=settings.transcriber.device,
-            compute_type=settings.transcriber.compute_type,
+        return OpenaiAsrTranscriber(
+            base_url=settings.transcriber.api_url,
+            api_key=settings.transcriber.api_key,
+            model=settings.transcriber.model,
             language=settings.transcriber.language,
-            batch_size=settings.transcriber.batch_size,
-            models_dir=settings.transcriber.models_dir,
         )
 
 
@@ -53,7 +51,7 @@ class TranscribeServiceProvider(Provider):
 
 
 class FakeTranscriberProvider(Provider):
-    """Test provider: fake transcriber (no GPU/model), real ffmpeg extractor."""
+    """Test provider: fake transcriber (no ASR endpoint), real ffmpeg extractor."""
 
     @provide(scope=Scope.APP)
     def transcriber(self) -> Transcriber:

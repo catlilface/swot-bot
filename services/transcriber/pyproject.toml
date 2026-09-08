@@ -1,14 +1,14 @@
 [project]
 name = "swot-transcriber"
 version = "0.1.0"
-description = "Transcriber service: ffmpeg audio extraction + faster-whisper (GPU) -> transcript.srt + segments.json"
+description = "Transcriber service: ffmpeg audio extraction + OpenAI-compatible ASR -> transcript.srt + segments.json"
 requires-python = ">=3.13"
 dependencies = [
     "swot-contracts>=0.1.0",
     "swot-observability>=0.1.0",
     "swot-bus>=0.1.0",
     "dishka>=1.10",
-    "faster-whisper>=1.1",
+    "openai>=1.55",
 ]
 
 [project.optional-dependencies]
