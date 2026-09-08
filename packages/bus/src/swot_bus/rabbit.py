@@ -8,6 +8,7 @@ heavy artifacts live on the shared volume.
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -16,7 +17,9 @@ from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
 from aio_pika.pool import Pool
 from swot_contracts import BaseMessage
 
-logger = None  # replaced by a logger in provider wiring
+logger = logging.getLogger(__name__)
+
+TRACE_ID_HEADER = "swot-trace-id"
 
 EXCHANGE_NAME = "swot.events"
 RESULT_QUEUE = "result.deliver"
@@ -80,9 +83,25 @@ class RabbitMessageBus:
             raise RuntimeError(msg)
         body = serialize(message)
         await self._exchange.publish(
-            aio_pika.Message(body=body, content_type="application/json"),
+            aio_pika.Message(
+                body=body,
+                content_type="application/json",
+                headers=self._trace_headers(),
+            ),
             routing_key=message.msg_type.value,
         )
+
+    @staticmethod
+    def _trace_headers() -> dict[str, str]:
+        """Copy the current structlog trace_id into a message header."""
+        try:
+            import structlog.contextvars  # noqa: PLC0415
+
+            ctx = structlog.contextvars.get_contextvars()
+            trace_id = ctx.get("trace_id")
+        except Exception:  # noqa: BLE001 - structlog not in this service
+            trace_id = None
+        return {TRACE_ID_HEADER: trace_id} if trace_id else {}
 
     async def consume(self, handler: Callable[[BaseMessage], Awaitable[None]]) -> None:
         """Bind a durable queue and dispatch messages to handler (long-running)."""
@@ -106,14 +125,26 @@ class RabbitMessageBus:
         from .serialization import deserialize
 
         try:
+            trace_id = (raw.headers or {}).get(TRACE_ID_HEADER)
+            if trace_id:
+                self._bind_trace(trace_id)
             message = deserialize(raw.body)
             await handler(message)
             await raw.ack()
         except Exception:
             # failure -> reject; DLQ/retry handled at broker level
             await raw.nack(requeue=False)
-            if logger is not None:
-                logger.exception("message processing failed")
+            logger.exception("message processing failed")
+
+    @staticmethod
+    def _bind_trace(trace_id: str) -> None:
+        """Restore trace_id in structlog context so logs keep one trace."""
+        try:
+            import structlog.contextvars  # noqa: PLC0415
+
+            structlog.contextvars.bind_contextvars(trace_id=trace_id)
+        except Exception:  # noqa: BLE001
+            return
 
     async def close(self) -> None:
         if self._pending_tasks:
