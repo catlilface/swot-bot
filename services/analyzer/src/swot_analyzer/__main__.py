@@ -1,11 +1,27 @@
-"""Entry point for the analyzer service."""
+"""Entry point for the analyzer service (wires DI via dishka)."""
 
 import asyncio
 
+from dishka import make_async_container
+from swot_bus import BusProvider, RegistryProvider
+
+from .providers import AnalyzerAdaptersProvider, AnalyzeServiceProvider
+from .service import AnalyzeService
+
 
 async def _amain() -> None:
-    # Placeholder entry point; LLM+Langfuse wiring lands in Этап 5 (task #12).
-    print("swot-analyzer service — placeholder")
+    container = make_async_container(
+        BusProvider(),
+        RegistryProvider(),
+        AnalyzerAdaptersProvider(),
+        AnalyzeServiceProvider(),
+    )
+    try:
+        async with container() as request_container:
+            service = await request_container.get(AnalyzeService)
+            await service.run()
+    finally:
+        await container.close()
 
 
 def main() -> None:
