@@ -197,14 +197,24 @@
   `sock_read` (не только `total`), проверка `Content-Type`/расширения, лимит размера
   файла.
 - Приёмка:
-  - [ ] Тест: скачивание медленного (> timeout_sec) ресурса → `DownloadError`/
+  - [x] Тест: скачивание медленного (> timeout_sec) ресурса → `DownloadError`/
         `JobFailed`, а не зависание; event loop не блокируется (параллельный тик
         healthz во время «скачивания» — проверка через fake-адаптер со сном в
         `to_thread`).
-  - [ ] Тест: `duration` в info > `max_duration_sec` → ошибка **до** скачивания.
-  - [ ] DirectHttp: ответ `text/html` на URL `*.mp4` → ошибка, файл не сохраняется.
-  - [ ] Файл > `MAX_FILE_MB` → прерывается, частичный файл удаляется.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+        (`test_download_adapters.py::test_slow_download_times_out_and_loop_stays_free` —
+        `wait_for` поверх `to_thread`, тикер ≥3 за 0.1 с, JobFailed(stage="download"),
+        registry=FAILED)
+  - [x] Тест: `duration` в info > `max_duration_sec` → ошибка **до** скачивания.
+        (`test_download_adapters.py::test_duration_rejected_before_download` — фаза
+        metadata вызвана, фаза download — нет)
+  - [x] DirectHttp: ответ `text/html` на URL `*.mp4` → ошибка, файл не сохраняется.
+        (`test_download_adapters.py::test_direct_http_text_html_rejected_no_file` —
+        live aiohttp-сервер, каталог после ошибки пуст)
+  - [x] Файл > `MAX_FILE_MB` → прерывается, частичный файл удаляется.
+        (`test_download_adapters.py::test_direct_http_oversize_aborted_partial_removed` —
+        1.5 МБ при лимите 1 МБ, частичный файл удалён)
+  - [x] `uv run pytest tests/ -q` — зелёные.
+        (82 теста; `ruff check`/`format --check` — чисто)
 
 ### T-1.4 ASR-чанкинг и LLM-чанкинг
 - Находки: P1-6, P1-7. Зависимости: нет.

@@ -12,6 +12,13 @@ from typing import Protocol
 from swot_contracts import SourceRef
 
 
+class DownloadError(Exception):
+    """Скачивание источника невозможно (таймаут, не-медиа content-type,
+    превышение размера/длительности и т.п.). Сервис преобразует его в
+    `JobFailed(stage="download")`.
+    """
+
+
 @dataclass(frozen=True)
 class DownloadedMedia:
     """Result of a successful download."""

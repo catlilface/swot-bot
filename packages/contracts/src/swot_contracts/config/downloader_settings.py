@@ -12,6 +12,7 @@ class DownloaderSettings(BaseSettings):
     """Video download limits (DOWNLOADER__*).
 
     ``DOWNLOADER__ALLOWED_SOURCES``, ``DOWNLOADER__MAX_VIDEO_DURATION_SEC``,
+    ``DOWNLOADER__DOWNLOAD_TIMEOUT_SEC``, ``DOWNLOADER__MAX_FILE_MB``,
     ``DOWNLOADER__RETENTION_HOURS``, ``DOWNLOADER__JOB_TIMEOUT_HOURS``.
     """
 
@@ -26,5 +27,7 @@ class DownloaderSettings(BaseSettings):
         ""  # comma-separated host allowlist, e.g. "rutube.ru,disk.yandex.ru"
     )
     max_video_duration_sec: int = 7200  # skip longer videos
+    download_timeout_sec: int = 300  # deadline for one download (per phase)
+    max_file_mb: int = 1024  # hard size limit for direct-HTTP downloads
     retention_hours: int = 168  # keep unprocessed artifacts for N hours
     job_timeout_hours: float = 6.0  # stuck (non-final) tasks fail after N hours

@@ -14,12 +14,18 @@ class DownloaderAdaptersProvider(Provider):
     """Concrete per-source adapter wiring (Swappable media downloaders)."""
 
     @provide(scope=Scope.APP)
-    def yt_dlp(self) -> YtDlpAdapter:
-        return YtDlpAdapter()
+    def yt_dlp(self, settings: Settings) -> YtDlpAdapter:
+        return YtDlpAdapter(
+            timeout_sec=settings.downloader.download_timeout_sec,
+            max_duration_sec=settings.downloader.max_video_duration_sec,
+        )
 
     @provide(scope=Scope.APP)
-    def direct(self) -> DirectHttpAdapter:
-        return DirectHttpAdapter()
+    def direct(self, settings: Settings) -> DirectHttpAdapter:
+        return DirectHttpAdapter(
+            timeout_sec=settings.downloader.download_timeout_sec,
+            max_file_mb=settings.downloader.max_file_mb,
+        )
 
     @provide(scope=Scope.APP)
     def router(self, yt_dlp: YtDlpAdapter, direct: DirectHttpAdapter) -> SourceRouter:
