@@ -44,6 +44,27 @@ docker compose logs -f fake-tg   # ответ бота (summary + SRT) логи�
 | `asr-service`, `llm-service` | фэйки (OpenAI-совместимые) |
 | `fake-tg` | заглушка Telegram Bot API (`POST /inject`) |
 
+### Dev-режим (fakes) и их семантика
+
+Единственный dev-режим в проекте — отдельные контейнеры dev-стека:
+`asr-service`, `llm-service` (OpenAI-совместимые фэйки, `services/fake/fake_openai.py`)
+и `fake-tg` (заглушка Telegram Bot API, `services/fake/fake_telegram.py`; образ
+`swot-bot/fake:dev`). Они существуют только в `docker-compose.yml`, не входят
+в образы сервисов пайплайна (их Dockerfile копируют только `packages/` и
+свой `services/<svc>/`) и не активны, когда dev-стек не поднят.
+
+Внутри процессов сервисов фэйков нет (T-2.3): in-process-двойники
+(`FakeBus`, `FakeTranscriber` / `FakeTranscriberProvider`, `StubSummarizer`
+и их `dishka`-провайдеры) удалены из production-модулей —
+`FakeTranscriberProvider` в коде больше не существует, поэтому он не
+регистрируется ни по умолчанию, ни по какому-либо флагу; активировать
+in-process-фейки нечем. Тестовые двойники (`FakeBus` + `FakeBusProvider`)
+живут в `tests/unit/fakes.py` и используются только из тестов.
+
+Следствие: в production-контейнерах (реальные ASR/LLM/Telegram) фэйки
+включить невозможно без явного изменения стека — только теми же
+compose-контейнерами, которые оператор осознанно включает в dev-стек.
+
 ### Переход на реальные зависимости
 
 В `.env` (комментарии там же):

@@ -377,8 +377,12 @@
 - Приёмка:
   - [x] Либо: production-модули не содержат `*Fake*`/`Stub*`; тесты используют
         перенесённые двойники — `pytest` зелёные.
-  - [ ] Либо: README/доки описывают dev-режим; `FakeTranscriberProvider` не
+  - [x] Либо: README/доки описывают dev-режим; `FakeTranscriberProvider` не
         регистрируется по умолчанию (только при флага).
+        (README-секция «Dev-режим (fakes) и их семантика»: dev-фейки — только
+        compose-контейнеры asr-service/llm-service/fake-tg (services/fake/);
+        in-process-фейки удалены из production-модулей, `FakeTranscriberProvider`
+        в коде не существует и ни по умолчанию, ни по флагу не регистрируется)
   - [x] Ревью: ни один production-контейнер не активирует фейки без явного флага.
 
 ### T-2.4 Контракты и рендер: точечные исправления
