@@ -214,7 +214,11 @@ async def test_bot_rejects_summary_path_outside_artifacts(tmp_path: Path) -> Non
         )
     )
 
-    assert bot.sent == []  # ничего не отправлено, render не вызывался
+    # T-1.7: вместо молчаливого проглатывания админ получает нормализованное
+    # уведомление (без traceback); сам файл не читается и не рендерится.
+    assert len(bot.sent) == 1
+    assert "Не удалось доставить результат" in bot.sent[0]
+    assert "Traceback" not in bot.sent[0]
 
 
 @pytest.mark.asyncio
