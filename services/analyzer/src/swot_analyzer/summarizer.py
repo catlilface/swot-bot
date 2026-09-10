@@ -41,9 +41,9 @@ class LlmSummarizer:
         if llm is not None:
             self._model = llm
         else:
-            self._model = ChatOpenAI(
+            self._model = ChatOpenAI(  # type: ignore[call-arg]  # stubs of langchain_openai lag the runtime API (max_tokens/request_timeout)
                 base_url=base_url,
-                api_key=api_key or "none",
+                api_key=api_key or "none",  # type: ignore[arg-type]  # runtime accepts str, stubs want SecretStr
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,

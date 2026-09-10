@@ -1,5 +1,7 @@
 """JSON serialization for RabbitMQ messages (pydantic v2)."""
 
+from typing import Any
+
 from swot_contracts import BaseMessage, MessageType
 
 
@@ -49,13 +51,14 @@ def _model_for(msg_type: MessageType) -> type[BaseMessage]:
         raise ValueError(f"unsupported msg_type: {msg_type}") from exc
 
 
-def _json_dumps(obj: dict) -> str:
+def _json_dumps(obj: dict[Any, Any]) -> str:
     import json
 
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
-def _json_loads(text: str) -> dict:
+def _json_loads(text: str) -> dict[str, Any]:
     import json
 
-    return json.loads(text)
+    result: dict[str, Any] = json.loads(text)
+    return result

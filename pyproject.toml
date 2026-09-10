@@ -16,6 +16,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
     "pre-commit>=4.0",
+    "mypy>=2.3.1",
 ]
 
 [tool.uv.workspace]
@@ -43,6 +44,28 @@ ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.mypy]
+python_version = "3.13"
+warn_unused_configs = true
+# close-to-strict (T-1.8): полный --strict несовместим с внешними lib
+# (aiogram/aio_pika), поэтому согласованный набор ниже.
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_reexport = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["aio_pika.*", "aio_pika"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["yt_dlp"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

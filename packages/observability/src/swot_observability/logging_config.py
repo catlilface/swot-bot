@@ -10,7 +10,7 @@ contextvars land in *every* line — structlog or stdlib alike (T-1.5).
 import logging
 import sys
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import structlog
 import structlog.contextvars
@@ -73,4 +73,4 @@ def configure_logging(level: str = "INFO") -> None:
 
 def get_logger(*args: Any, **kwargs: Any) -> structlog.stdlib.BoundLogger:
     """Return a structlog logger (JSON, contextvars-aware)."""
-    return structlog.get_logger(*args, **kwargs)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(*args, **kwargs))

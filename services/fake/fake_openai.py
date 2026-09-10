@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FAKE_TEXT = (
@@ -129,7 +130,7 @@ class FakeAsrHandler(BaseHTTPRequestHandler):
                 return
             print(
                 f"[fake-asr] transcription: {len(parts['file'])} bytes, "
-                f"model={parts.get(b'model', b'').decode(errors='replace')!r}",
+                f"model={parts.get('model', b'').decode(errors='replace')!r}",
                 flush=True,
             )
             _json(
@@ -215,7 +216,7 @@ class FakeLlmHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    mode = (os.sys.argv[1] if len(os.sys.argv) > 1 else "asr").lower()
+    mode = (sys.argv[1] if len(sys.argv) > 1 else "asr").lower()
     port = int(os.environ.get("FAKE_PORT", "8000"))
     handler = FakeAsrHandler if mode == "asr" else FakeLlmHandler
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)

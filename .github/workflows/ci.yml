@@ -33,6 +33,24 @@ jobs:
         run: |
           uv run python -c "import swot_contracts, swot_observability, swot_bus, swot_bot, swot_downloader, swot_transcriber, swot_analyzer; print('imports OK')"
 
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync workspace
+        run: uv sync --all-packages
+
+      # Blocks the merge on any type error (close-to-strict set from pyproject.toml, T-1.8).
+      - name: Mypy
+        run: uv run mypy packages services
+
   docker-build:
     runs-on: ubuntu-latest
     steps:
@@ -46,3 +64,85 @@ jobs:
             docker run --rm swot-bot-$svc python -c "import swot_$svc; print('import OK: swot_$svc')"
           done
           docker run --rm swot-bot-bot python -c "import aiogram, aio_pika, structlog; print('smoke deps OK')"
+
+  compose-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start stack (real compose file, dev fakes as ASR/LLM/Telegram)
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+
+      - name: Wait until all containers are healthy (<= 5 min)
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+          import time
+
+          def state():
+              out = subprocess.run(
+                  ["docker", "compose", "ps", "--format", "json"],
+                  capture_output=True,
+                  text=True,
+              ).stdout
+              return [json.loads(line) for line in out.strip().splitlines() if line]
+
+          for _ in range(60):
+              rows = state()
+              bad = [r["Name"] for r in rows if r.get("Health") != "healthy"]
+              if not bad:
+                  print("all containers healthy:", len(rows))
+                  sys.exit(0)
+              time.sleep(5)
+          print("still unhealthy:", bad, file=sys.stderr)
+          sys.exit(1)
+          PY
+
+      - name: Healthz/readyz of the 4 pipeline services
+        run: |
+          for svc in bot downloader transcriber analyzer; do
+            docker compose exec -T "$svc" python -c \
+              "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"
+            docker compose exec -T "$svc" python -c \
+              "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"
+          done
+
+      - name: E2E run (link from admin -> summary + SRT in the chat)
+        run: |
+          set -eu
+          curl -fsS -X POST http://localhost:8081/inject \
+            -H 'Content-Type: application/json' \
+            -d '{"text": "http://fake-tg:8081/media/sample.wav"}'
+          for i in $(seq 1 36); do
+            if docker compose logs --no-color fake-tg 2>/dev/null \
+               | grep -q 'sendDocument.*document=transcript.srt'; then
+              echo "E2E result delivered (summary + SRT)"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs --no-color bot downloader transcriber analyzer 2>&1 | tail -100 >&2
+          exit 1
+
+      - name: Same trace_id in all 4 services (T-1.5)
+        run: |
+          set -eu
+          TRACE=$(docker compose logs --no-color bot 2>/dev/null \
+            | grep 'result delivered' \
+            | grep -oE '"trace_id": "t-[a-f0-9]+"' | head -1 | cut -d'"' -f4)
+          [ -n "$TRACE" ] || { echo "trace_id not found in bot logs" >&2; exit 1; }
+          echo "trace_id: $TRACE"
+          for svc in downloader transcriber analyzer; do
+            docker compose logs --no-color "$svc" 2>/dev/null \
+              | grep -q "\"trace_id\": \"$TRACE\"" \
+              || { echo "trace $TRACE not found in $svc" >&2; exit 1; }
+            echo "$svc: trace OK"
+          done
+
+      - name: Teardown (always)
+        if: always()
+        run: docker compose down -v || true

@@ -1,12 +1,15 @@
 """Analyzer application service: transcript.ready -> summary.json -> analysis.ready."""
 
+from __future__ import annotations
+
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from swot_contracts import (
     AnalysisReady,
+    BaseMessage,
     JobFailed,
     JobProgress,
     JobStatus,
@@ -17,7 +20,7 @@ from swot_contracts import (
 from swot_contracts.ports import JobRegistry
 
 if TYPE_CHECKING:
-    from .domain import PromptProvider, Summarizer
+    from .domain import PromptProvider, Summarizer, Summary
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +31,8 @@ class AnalyzeService:
     def __init__(
         self,
         prompt_name: str,
-        prompt_provider: "PromptProvider",
-        summarizer: "Summarizer",
+        prompt_provider: PromptProvider,
+        summarizer: Summarizer,
         bus: MessageBus,
         registry: JobRegistry,
         artifacts_dir: str,
@@ -106,10 +109,14 @@ class AnalyzeService:
         return "\n".join(text_lines)
 
     async def run(self) -> None:
-        await self._bus.consume(self.handle)
+        async def dispatch(message: BaseMessage) -> None:
+            if isinstance(message, TranscriptReady):
+                await self.handle(message)
+
+        await self._bus.consume(dispatch)
 
 
-def _summary_to_dict(summary) -> dict:
+def _summary_to_dict(summary: Summary) -> dict[str, Any]:
     return {
         "summary": summary.summary,
         "sections": [

@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from swot_contracts import SourceRef
@@ -134,12 +135,15 @@ class YtDlpAdapter:
             raise DownloadError(f"download timed out after {self._timeout}s") from exc
 
 
-def _yt_dlp_run(opts: dict, url: str, download: bool) -> dict | None:
+def _yt_dlp_run(
+    opts: dict[str, Any], url: str, download: bool
+) -> dict[str, Any] | None:
     """Synchronous yt-dlp call (runs in a worker thread, see YtDlpAdapter)."""
     import yt_dlp
 
     with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info(url, download=download)
+        result = ydl.extract_info(url, download=download)
+        return cast("dict[str, Any] | None", result)
 
 
 class DirectHttpAdapter:

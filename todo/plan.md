@@ -313,19 +313,27 @@
   (2) job `docker-build` (T-0.2); (3) job `compose`: testcontainers (RabbitMQ + fake
   ASR/LLM) → поднять 4 сервиса, проверка healthz + сквозного пайплайна.
 - Приёмка:
-  - [ ] CI: мойпы-ошибка блокирует merge (`mypy packages services --strict` или
-        согласованный набор).
-  - [ ] CI: docker-build job зелёный на main.
-  - [ ] CI: compose-integration job зелёный (healthz 4 сервисов + E2E-прогон).
-  - [ ] Локально воспроизводимо: `uv run mypy packages services` — без ошибок.
+  - [x] CI: мойпы-ошибка блокирует merge (`mypy packages services --strict` или
+        согласованный набор). (отдельный CI-джоб `mypy`: `uv run mypy packages services`,
+        close-to-strict набор в `pyproject.toml` — полный strict несовместим со
+        stub'ами aiogram/aio_pika/langchain_openai)
+  - [x] CI: docker-build job зелёный на main. (джоб `docker-build`: сборка всех 4
+        образов + smoke-импорт, падает на `ModuleNotFoundError`)
+  - [x] CI: compose-integration job зелёный (healthz 4 сервисов + E2E-прогон).
+        (джоб `compose-integration`: `docker compose up -d --build` → 8/8 healthy,
+        healthz+readyz всех 4 сервисов, E2E /inject → summary + SRT, единый
+        `trace_id` в логах 4 сервисов; локально воспроизведено 2026-09-10,
+        trace t-f30dcb87b3d0)
+  - [x] Локально воспроизводимо: `uv run mypy packages services` — без ошибок.
+        (53 source files, no issues)
 
 **Критерий приёмки фазы 1:**
-- [ ] Потеря сообщения в любом узле пайплайна обнаруживается (DLQ) и не «зависает»
+- [x] Потеря сообщения в любом узле пайплайна обнаруживается (DLQ) и не «зависает»
       статус задачи (reaper).
-- [ ] Лекция 2+ часа проходит до результата без OOM/таймаутов (чанкинг ASR/LLM).
-- [ ] В логах любого узла виден сквозной `trace_id`; `/readyz` отражает реальное
+- [x] Лекция 2+ часа проходит до результата без OOM/таймаутов (чанкинг ASR/LLM).
+- [x] В логах любого узла виден сквозной `trace_id`; `/readyz` отражает реальное
       состояние брокера; `SIGTERM` — graceful.
-- [ ] CI ловляет: типы, битые Docker-образы, битый compose-стек.
+- [x] CI ловляет: типы, битые Docker-образы, битый compose-стек.
 
 ---
 

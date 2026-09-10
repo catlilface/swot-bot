@@ -67,7 +67,7 @@ class OpenaiAsrTranscriber:
         for idx, chunk in enumerate(chunks):
             offset = idx * self._segment_duration_sec
             with chunk.open("rb") as f:
-                result = await self._client.audio.transcriptions.create(
+                result = await self._client.audio.transcriptions.create(  # type: ignore[call-overload]  # stubs openai не принимают кортеж file вместе с verbose_json (рабочая форма API)
                     model=self._model,
                     file=(chunk.name, f, "audio/wav"),
                     response_format="verbose_json",

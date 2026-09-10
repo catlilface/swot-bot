@@ -7,6 +7,7 @@ from aiogram import Router
 from dishka import Provider, Scope, provide
 from swot_contracts import (
     AnalysisReady,
+    BaseMessage,
     JobFailed,
     JobProgress,
     MessageBus,
@@ -73,7 +74,7 @@ class BotConsumer:
         self._reporter = reporter
 
     async def __call__(self) -> None:
-        async def handler(message) -> None:
+        async def handler(message: BaseMessage) -> None:
             if isinstance(message, AnalysisReady):
                 await self._reporter.on_analysis(message)
             elif isinstance(message, JobFailed):

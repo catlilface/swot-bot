@@ -18,7 +18,7 @@ heavy artifacts live on the shared volume.
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
@@ -71,7 +71,7 @@ class RabbitMessageBus:
         self._max_retries = max_retries
         self._dlx_name = dlx_name_for(exchange_name)
         self._connection: AbstractRobustConnection | None = None
-        self._channel_pool: Pool | None = None
+        self._channel_pool: Pool[Any] | None = None
         self._exchange: Any = None
         self._dlx: Any = None
         self._job_events_exchange: Any = None
@@ -80,7 +80,7 @@ class RabbitMessageBus:
     async def connect(self) -> "RabbitMessageBus":
         connection = await aio_pika.connect_robust(self._url)
         self._connection = connection
-        channel_pool = Pool(self._open_channel, max_size=10)
+        channel_pool: Pool[Any] = Pool(self._open_channel, max_size=10)
         self._channel_pool = channel_pool
         async with channel_pool.acquire() as channel:
             self._exchange = await channel.declare_exchange(
@@ -123,7 +123,7 @@ class RabbitMessageBus:
         )
 
     @staticmethod
-    def _trace_headers() -> dict[str, str]:
+    def _trace_headers() -> dict[str, Any]:
         """Copy the current structlog trace_id into a message header."""
         try:
             import structlog.contextvars  # noqa: PLC0415
@@ -162,6 +162,10 @@ class RabbitMessageBus:
             "x-dead-letter-exchange": self._dlx_name,
             "x-dead-letter-routing-key": self._queue_name,
         }
+        channel_pool = self._channel_pool
+        if channel_pool is None:
+            msg = "bus not connected"
+            raise RuntimeError(msg)
         try:
             return await self._declare_once(channel, arguments)
         except AMQPChannelError:
@@ -172,7 +176,7 @@ class RabbitMessageBus:
             )
             # The channel used above was closed at the broker level, so the
             # migration (delete + re-declare) runs on a fresh channel.
-            async with self._channel_pool.acquire() as fresh:
+            async with channel_pool.acquire() as fresh:
                 await self._delete_quietly(fresh, self._queue_name)
                 await self._delete_quietly(fresh, dlq_name_for(self._queue_name))
                 return await self._declare_once(fresh, arguments)
@@ -205,14 +209,17 @@ class RabbitMessageBus:
         from .serialization import deserialize
 
         headers = raw.headers or {}
+        raw_attempts = headers.get(ATTEMPTS_HEADER, "0")
+        if isinstance(raw_attempts, bytes):
+            raw_attempts = raw_attempts.decode()
         try:
-            attempts = int(headers.get(ATTEMPTS_HEADER, "0"))
+            attempts = int(cast(str, raw_attempts))
         except (TypeError, ValueError):
             attempts = 0
         try:
             trace_id = headers.get(TRACE_ID_HEADER)
-            if trace_id:
-                self._bind_trace(trace_id)
+            if trace_id is not None:
+                self._bind_trace(str(trace_id))
             message = deserialize(raw.body)
             self._bind_message_context(message)
             await handler(message)

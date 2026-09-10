@@ -33,5 +33,5 @@ class LangfuseSettings(BaseSettings):
     secret_key: str = ""
 
     @property
-    def base_url(self):
+    def base_url(self) -> str:
         return f"http://{self.host}:{self.port}"

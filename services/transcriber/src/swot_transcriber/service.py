@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swot_contracts import (
+    BaseMessage,
     JobProgress,
     JobStatus,
     MessageBus,
@@ -116,4 +117,8 @@ class TranscribeService:
             logger.warning("media cleanup failed: path=%s error=%s", media_path, exc)
 
     async def run(self) -> None:
-        await self._bus.consume(self.handle)
+        async def dispatch(message: BaseMessage) -> None:
+            if isinstance(message, VideoDownloaded):
+                await self.handle(message)
+
+        await self._bus.consume(dispatch)

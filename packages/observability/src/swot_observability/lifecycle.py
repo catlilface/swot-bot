@@ -55,6 +55,9 @@ async def run_until_shutdown(
                 task.cancel()
         await asyncio.gather(*tasks, stop_task, return_exceptions=True)
     for task in tasks:
-        if not task.cancelled() and task.exception() is not None:
-            raise task.exception()
+        if task.cancelled():
+            continue  # штатное отменённое завершение (shutdown)
+        exc = task.exception()
+        if exc is not None:
+            raise exc
     logger.info("shutdown: %d work task(s) stopped", len(tasks))

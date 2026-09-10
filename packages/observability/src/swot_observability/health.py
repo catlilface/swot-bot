@@ -68,10 +68,11 @@ class HealthServer:
         if self._site is None or self._site._server is None:  # noqa: SLF001
             msg = "health server not started"
             raise RuntimeError(msg)
-        if not self._site._server.sockets:  # noqa: SLF001
+        sockets = self._site._server.sockets  # type: ignore[attr-defined]  # noqa: SLF001
+        if not sockets:
             msg = "health server socket unavailable"
             raise RuntimeError(msg)
-        return self._site._server.sockets[0].getsockname()[1]  # noqa: SLF001
+        return int(sockets[0].getsockname()[1])
 
     async def stop(self) -> None:
         """Gracefully stop the server; a no-op if not started."""

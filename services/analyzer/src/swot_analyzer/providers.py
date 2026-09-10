@@ -21,14 +21,15 @@ class AnalyzerAdaptersProvider(Provider):
 
     @provide(scope=Scope.APP)
     def prompt_provider(self, settings: Settings) -> PromptProvider:
+        local_prompt: LocalPromptProvider = self.local_prompt()
         if settings.langfuse.public_key and settings.langfuse.secret_key:
             return LangfusePromptProvider(
                 public_key=settings.langfuse.public_key,
                 secret_key=settings.langfuse.secret_key,
                 base_url=settings.langfuse.base_url,
-                fallback=self.local_prompt(),
+                fallback=local_prompt,
             )
-        return self.local_prompt()
+        return local_prompt
 
     @provide(scope=Scope.APP)
     def summarizer(self, settings: Settings) -> Summarizer:

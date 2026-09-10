@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swot_contracts import (
+    BaseMessage,
     DownloadRequest,
     JobProgress,
     JobStatus,
@@ -126,8 +127,13 @@ class DownloaderService:
         reaper = self.make_reaper()
         reaper_task = asyncio.create_task(reaper.run(REAPER_INTERVAL_SEC))
         cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+        async def dispatch(message: BaseMessage) -> None:
+            if isinstance(message, DownloadRequest):
+                await self.handle(message)
+
         try:
-            await self._bus.consume(self.handle)
+            await self._bus.consume(dispatch)
         finally:
             reaper_task.cancel()
             cleanup_task.cancel()

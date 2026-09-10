@@ -31,6 +31,7 @@ import time
 import wave
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 from urllib.parse import parse_qs
 
 ADMIN_ID = int(os.environ.get("FAKE_ADMIN_ID", "12345678"))
@@ -94,7 +95,7 @@ def _parse_multipart(body: bytes, content_type: str) -> dict[str, bytes]:
 
 
 class FakeTelegramHandler(BaseHTTPRequestHandler):
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._body: bytes = b""
 

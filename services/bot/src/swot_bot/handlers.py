@@ -8,7 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 import structlog.contextvars
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import (
     TelegramNetworkError,
     TelegramRetryAfter,
@@ -143,7 +143,7 @@ class ResultReporter:
 
     def __init__(
         self,
-        bot,
+        bot: Bot,
         target_chat_id: int,
         renderer: MessageRenderer,
         artifacts_dir: str,
@@ -216,12 +216,11 @@ class ResultReporter:
 
         text = self._renderer.render(summary)
         for part in _chunk_text(text):
-            await self._send(
-                lambda p=part: self._bot.send_message(
-                    self._target, p, parse_mode="HTML"
-                ),
-                what="result message",
-            )
+
+            async def send_part(text_part: str = part) -> None:
+                await self._bot.send_message(self._target, text_part, parse_mode="HTML")
+
+            await self._send(send_part, what="result message")
 
         srt = self._artifacts / str(msg.task_id) / "transcript.srt"
         try:

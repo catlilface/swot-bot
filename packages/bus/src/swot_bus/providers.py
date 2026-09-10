@@ -6,6 +6,7 @@ override the providers / adapters freely (see service tests).
 """
 
 from collections.abc import AsyncIterable
+from typing import Any
 
 from dishka import Provider, Scope, provide
 from swot_contracts import MessageBus, Settings
@@ -61,7 +62,7 @@ class RegistryProvider(Provider):
 class FakeBusProvider(Provider):
     """Test/local provider: in-memory MessageBus instead of RabbitMQ."""
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     @provide(scope=Scope.APP)

@@ -109,7 +109,7 @@ class LangfusePromptProvider:
                 name,
                 label="production",
                 fallback=self._fallback.get(name),
-                fetch_timeout_seconds=self._fetch_timeout_seconds,
+                fetch_timeout_seconds=int(self._fetch_timeout_seconds),
             )
             text = _prompt_to_text(prompt)
             return text if text else self._fallback.get(name)
