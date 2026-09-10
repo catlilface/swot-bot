@@ -25,8 +25,8 @@ curl -X POST http://localhost:8081/inject \
 docker compose logs -f fake-tg   # ответ бота (summary + SRT) логируется здесь
 ```
 
-Пример ссылки: любой прямо-доступный mp4/m4a (например,
-`https://www.dropbox.com/...?dl=1` не поддерживается — нужен прямой URL).
+Пример ссылки: платформа (YouTube, VK, Rutube, диск, Drive…)
+или прямой URL на медиа-файл (mp4/m4a/wav…).
 
 Логи пайплайна: `docker compose logs -f bot downloader transcriber analyzer`.
 Все четыре сервиса пишут общий `trace_id` (заголовок сообщения в RabbitMQ) —
@@ -91,6 +91,6 @@ compose-контейнерами, которые оператор осознан
 ## Документация
 
 - [docs/architecture.md](docs/architecture.md) — каноническая архитектура
-  (микросервисы, CQRS/event-driven, адаптеры источников, шаблон сообщения,
-  docker-compose).
-- [docs/plan.md](docs/plan.md) — этапный план работ и исследование стека.
+  (пайплайн, контракты, адаптеры источников, безопасность, dev-стек).
+- [todo/plan.md](todo/plan.md) — этапный план работ; исследование —
+  [audit.md](audit.md), снимки ревью — `reviews/`.

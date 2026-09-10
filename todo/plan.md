@@ -421,11 +421,11 @@
 - Работа: дописать `docs/architecture.md` (или убрать ссылки из README и
   docstring'ов), quickstart (локально + docker), решить судьбу `reviews/`.
 - Приёмка:
-  - [ ] `grep -rn "docs/architecture.md\|docs/plan.md" README.md packages services` —
+  - [x] `grep -rn "docs/architecture.md\|docs/plan.md" README.md packages services` —
         либо файлы существуют, либо ссылок нет.
-  - [ ] По README с чистого клона: `cp .env.example .env && docker compose up` —
+  - [x] По README с чистого клона: `cp .env.example .env && docker compose up` —
         инструкции совпадают с compose (T-0.5).
-  - [ ] `git status` — `reviews/` закоммичен или в `.gitignore`.
+  - [x] `git status` — `reviews/` закоммичен или в `.gitignore`.
 
 ### T-2.7 Тесты: round-trip, stubs, aiogram-хендлеры
 - Находки: P1-12, P2-12. Зависимости: T-1.2 (DLX — тестируется там).
