@@ -7,7 +7,7 @@ from uuid import UUID
 
 from dishka import make_async_container
 from swot_bus import FakeBus, InMemoryJobRegistry, RegistryProvider
-from swot_contracts import DownloadRequest, JobStatus, SourceRef
+from swot_contracts import DownloadRequest, JobProgress, JobStatus, SourceRef
 from swot_contracts.ports import JobRegistry
 from swot_downloader.domain import DownloadedMedia
 from swot_downloader.service import DownloaderService
@@ -80,6 +80,31 @@ async def test_downloader_publishes_video_downloaded(tmp_path: Path) -> None:
     assert ready.msg_type.value == "video.downloaded"
     assert ready.media_path.endswith("media.m4a")
     assert await registry.get_status(task_id) == JobStatus.READY
+
+
+async def test_downloader_publishes_job_progress(tmp_path: Path) -> None:
+    """T-1.6: до начала скачивания публикуется JobProgress(stage="downloading")."""
+    bus = FakeBus()
+    task_id = UUID("00000000-0000-0000-0000-000000000010")
+    svc = DownloaderService(
+        media_dir=str(tmp_path),
+        router=StubRouter(tmp_path),  # type: ignore[arg-type]
+        bus=bus,  # type: ignore[arg-type]
+        registry=InMemoryJobRegistry(),  # type: ignore[arg-type]
+    )
+    await svc.handle(
+        DownloadRequest(
+            task_id=task_id,
+            trace_id="t-10",
+            source=SourceRef(url="https://disk.yandex.ru/i/abc", kind="yandex_disk"),
+        )
+    )
+    progress = bus.get(0)
+    assert isinstance(progress, JobProgress)
+    assert progress.msg_type.value == "job.progress"
+    assert progress.stage == "downloading"
+    assert progress.task_id == task_id
+    assert progress.trace_id == "t-10"
 
 
 async def test_dishka_fake_container_resolves_services() -> None:
