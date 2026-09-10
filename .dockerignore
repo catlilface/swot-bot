@@ -1,0 +1,31 @@
+# VCS / local state
+.git
+.gitignore
+.venv
+.env
+.pytest_cache
+.ruff_cache
+.pyright
+.coverage
+htmlcov
+
+# Agent / docs / tooling
+.pi/
+.agents/
+docs/
+reviews/
+todo/
+*.md
+
+# Python build junk
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Docker itself
+.docker
+docker-compose.yml
+.env.example

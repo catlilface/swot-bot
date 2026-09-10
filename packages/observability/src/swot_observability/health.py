@@ -36,7 +36,7 @@ class HealthServer:
         try:
             ok = await self._readiness()
         except Exception as exc:  # noqa: BLE001
-            logger.exception("readiness check failed", error=str(exc))
+            logger.exception("readiness check failed: error=%s", exc)
             ok = False
         return web.json_response(
             {"status": "ok" if ok else "degraded"}, status=200 if ok else 503
@@ -47,6 +47,6 @@ class HealthServer:
         await runner.setup()
         site = web.TCPSite(runner, self._host, self._port)
         await site.start()
-        logger.info("health server started", host=self._host, port=self._port)
+        logger.info("health server started: host=%s port=%d", self._host, self._port)
         # Keep the runner alive (caller usually runs this as a task).
         await asyncio.Event().wait()

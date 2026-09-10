@@ -32,3 +32,17 @@ jobs:
       - name: Import all packages
         run: |
           uv run python -c "import swot_contracts, swot_observability, swot_bus, swot_bot, swot_downloader, swot_transcriber, swot_analyzer; print('imports OK')"
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all images + smoke-import
+        run: |
+          for svc in bot downloader transcriber analyzer; do
+            docker build -f .docker/$svc/Dockerfile -t swot-bot-$svc .
+            # Fails the job on ModuleNotFoundError (deps must be in the runtime image).
+            docker run --rm swot-bot-$svc python -c "import swot_$svc; print('import OK: swot_$svc')"
+          done
+          docker run --rm swot-bot-bot python -c "import aiogram, aio_pika, structlog; print('smoke deps OK')"

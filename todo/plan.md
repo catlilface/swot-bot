@@ -45,14 +45,14 @@
   всех `services/`; `ENV PATH="/app/.venv/bin:$PATH"`; добавить `.dockerignore`
   (`.git`, `.venv`, `.env`, `*.md` по вкусу); non-root `USER` (T-2.8, сюда же).
 - Приёмка:
-  - [ ] `docker build -f .docker/bot/Dockerfile -t swot-bot-bot .` →
+  - [x] `docker build -f .docker/bot/Dockerfile -t swot-bot-bot .` →
         `docker run --rm swot-bot-bot python -m swot_bot` стартует (падает только на
         отсутствии `TELEGRAM__TOKEN`/подключении к брокеру — **не** на
         `ModuleNotFoundError`).
-  - [ ] То же для downloader/transcriber/analyzer: `python -m swot_<svc>` стартует.
-  - [ ] `docker run --rm swot-bot-bot python -c "import aiogram, aio_pika, structlog"` —
+  - [x] То же для downloader/transcriber/analyzer: `python -m swot_<svc>` стартует.
+  - [x] `docker run --rm swot-bot-bot python -c "import aiogram, aio_pika, structlog"` —
         без ошибок.
-  - [ ] CI-job `docker-build`: собирается каждый образ + smoke-импорт; job падает на
+  - [x] CI-job `docker-build`: собирается каждый образ + smoke-импорт; job падает на
         `ModuleNotFoundError`.
 
 ### T-0.3 Роутинг источников: инверсия `SourceRouter`
