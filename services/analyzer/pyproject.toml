@@ -11,7 +11,7 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-openai>=0.3",
     "langchain-text-splitters>=0.3",
-    "langfuse>=2.60",
+    "langfuse>=4,<5",
     "openai>=1.55",
 ]
 

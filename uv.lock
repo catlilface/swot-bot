@@ -1554,7 +1554,7 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=0.3" },
     { name = "langchain-text-splitters", specifier = ">=0.3" },
-    { name = "langfuse", specifier = ">=2.60" },
+    { name = "langfuse", specifier = ">=4,<5" },
     { name = "openai", specifier = ">=1.55" },
     { name = "swot-bus", editable = "packages/bus" },
     { name = "swot-contracts", editable = "packages/contracts" },

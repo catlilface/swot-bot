@@ -24,7 +24,11 @@ class LlmSummarizer:
         )
 
     async def summarize(self, transcript: str, prompt: str) -> Summary:
-        template = ChatPromptTemplate.from_template(prompt)
+        template = (
+            ChatPromptTemplate.from_template(prompt)
+            if isinstance(prompt, str)
+            else prompt
+        )
         structured_llm = self._model.with_structured_output(Summary)
         chain = template | structured_llm
         result = await chain.ainvoke({"input": transcript})

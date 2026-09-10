@@ -80,13 +80,13 @@
   гарантированно возвращает `str`; зафиксировать `langfuse>=4,<5` (установлен 4.15.1,
   код писался под 2.x — проверить `get_prompt(fallback=)`).
 - Приёмка:
-  - [ ] `ChatPromptTemplate.from_template(LOCAL_PROMPT)` — без исключений.
-  - [ ] Новый тест: `LlmSummarizer.summarize` с фейковым LLM (ловит `ainvoke`-вход):
+  - [x] `ChatPromptTemplate.from_template(LOCAL_PROMPT)` — без исключений.
+  - [x] Новый тест: `LlmSummarizer.summarize` с фейковым LLM (ловит `ainvoke`-вход):
         транскрипт присутствует в промпте, JSON-пример не сломан, парсинг ответа
         работает (модель фиксированного JSON).
-  - [ ] Тест fallback-пути: `LangfusePromptProvider` с недоступным host → возвращает
+  - [x] Тест fallback-пути: `LangfusePromptProvider` с недоступным host → возвращает
         `LOCAL_PROMPT` как `str` (не `ChatPromptTemplate`).
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+  - [x] `uv run pytest tests/ -q` — зелёные.
 
 ### T-0.5 docker-compose: рабочий стек
 - Находки: P0-5, P2-11. Зависимости: T-0.2 (для приёмки).
