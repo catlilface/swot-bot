@@ -64,12 +64,12 @@
   `DirectHttpAdapter`; (3) остальное → `YtDlpAdapter` (yt-dlp как дефолт) либо явная
   ошибка. `route()` возвращает источник, как заявлено в docstring.
 - Приёмка:
-  - [ ] Unit-тесты `route()`: youtube.com / vk.com / rutube.ru / drive.google.com /
+  - [x] Unit-тесты `route()`: youtube.com / vk.com / rutube.ru / drive.google.com /
         disk.yandex.ru / vimeo.com → `YtDlpAdapter`; `example.com/video.mp4` →
         `DirectHttpAdapter`; `example.com/watch?v=...` → `YtDlpAdapter`.
-  - [ ] Интеграционный (или unit с фиксами): `YtDlpAdapter` на коротком видео-URL
+  - [x] Интеграционный (или unit с фиксами): `YtDlpAdapter` на коротком видео-URL
         (можно через тестовый HTTP-сервер, отдающий .m4a) → файл с медиа, не HTML.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+  - [x] `uv run pytest tests/ -q` — зелёные.
 
 ### T-0.4 Промпт-цепочка анализатора
 - Находки: P0-4. Зависимости: нет.
