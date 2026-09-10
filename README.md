@@ -20,7 +20,7 @@ docker compose ps           # всё running/healthy через ~1–2 мин
 ```bash
 curl -X POST http://localhost:8081/inject \
   -H 'Content-Type: application/json' \
-  -d '{"text": "https://example.com/lecture.mp4"}'
+  -d '{"text": "http://fake-tg:8081/media/sample.wav"}'
 
 docker compose logs -f fake-tg   # ответ бота (summary + SRT) логируется здесь
 ```

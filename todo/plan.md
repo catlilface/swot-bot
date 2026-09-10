@@ -253,12 +253,20 @@
   `task_id/stage` при обработке); structlog stdlib integration, чтобы aio_pika/
   aiohttp/aiogram/openai логились в тот же JSON.
 - Приёмка:
-  - [ ] Тест: `bus.publish(...)` после `bind_contextvars(trace_id=X)` → в header
+  - [x] Тест: `bus.publish(...)` после `bind_contextvars(trace_id=X)` → в header
         сообщения `swot-trace-id: X`; consumer биндит его в контекст (round-trip).
-  - [ ] В логах бота, downloader, transcriber, analyzer одного прогона — одинаковый
+        (`tests/unit/test_trace.py::test_roundtrip_header_and_context` — stub aio_pika;
+        `::test_roundtrip_live_broker` — живой RabbitMQ из compose; оба зелёные)
+  - [x] В логах бота, downloader, transcriber, analyzer одного прогона — одинаковый
         `trace_id` и `task_id` (ручная проверка по compose-логам + тест).
-  - [ ] `docker compose logs` — каждый JSON-лог (включая `aio_pika`, `openai`)
+        (E2E `t-1310d76e8433` / task `1310d76e-…`: bot «link received»+«result delivered»,
+        downloader «video downloaded», transcriber «transcript ready», analyzer «summary ready» —
+        единый trace/task во всех 4; stdlib-логгеры `httpx`/`aiohttp` тоже несут контекст)
+  - [x] `docker compose logs` — каждый JSON-лог (включая `aio_pika`, `openai`)
         парсится `json.loads`.
+        (проверено скриптом: bot/downloader/transcriber/analyzer — 143 строки, 0 non-JSON;
+        stdlib-логгеры идут через тот же `ProcessorFormatter`; fake-заглушки и
+        rabbitmq — plain-text по design, не сервисы пайплайна)
 
 ### T-1.6 Health: readiness и graceful shutdown
 - Находки: P1-9. Зависимости: нет.

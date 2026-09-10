@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
+import structlog.contextvars
 from aiogram import F, Router
 from aiogram.types import BufferedInputFile, Message
 from dishka import FromDishka
@@ -66,18 +67,29 @@ def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
 
         task_id = uuid4()
         trace_id = f"t-{task_id.hex[:12]}"
-        logger.info(
-            "link received: task_id=%s trace_id=%s url=%s", task_id, trace_id, user_text
+        # Bind BEFORE the first publish so the swot-trace-id header and the
+        # bot's own logs carry the run's context (T-1.5).
+        structlog.contextvars.bind_contextvars(
+            task_id=str(task_id), trace_id=trace_id, stage="new"
         )
-        await registry.create(task_id, url)
-        await bus.publish(
-            DownloadRequest(
-                task_id=task_id,
-                trace_id=trace_id,
-                source=SourceRef(url=url, kind=_kind_for(url)),
+        try:
+            logger.info(
+                "link received: task_id=%s trace_id=%s url=%s",
+                task_id,
+                trace_id,
+                user_text,
             )
-        )
-        await message.answer("✅ Задача принята, обрабатываю…")
+            await registry.create(task_id, url)
+            await bus.publish(
+                DownloadRequest(
+                    task_id=task_id,
+                    trace_id=trace_id,
+                    source=SourceRef(url=url, kind=_kind_for(url)),
+                )
+            )
+            await message.answer("✅ Задача принята, обрабатываю…")
+        finally:
+            structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
 
     return router, admin_filter
 
@@ -98,49 +110,81 @@ class ResultReporter:
         self._artifacts = Path(artifacts_dir)
 
     async def on_analysis(self, msg: AnalysisReady) -> None:
+        structlog.contextvars.bind_contextvars(
+            task_id=str(msg.task_id), trace_id=msg.trace_id, stage="delivery"
+        )
         try:
-            # Path containment: summary_path comes from the analyzer message and
-            # must stay inside the bot's own artifacts dir (P0-6).
-            summary = resolve_under(self._artifacts, msg.summary_path)
-        except ValueError as exc:
-            logger.error(
-                "refusing summary outside artifacts: task_id=%s path=%s error=%s",
-                msg.task_id,
-                msg.summary_path,
-                exc,
-            )
-            return
+            try:
+                # Path containment: summary_path comes from the analyzer message and
+                # must stay inside the bot's own artifacts dir (P0-6).
+                summary = resolve_under(self._artifacts, msg.summary_path)
+            except ValueError as exc:
+                logger.error(
+                    "refusing summary outside artifacts: task_id=%s path=%s error=%s",
+                    msg.task_id,
+                    msg.summary_path,
+                    exc,
+                )
+                return
 
-        text = self._renderer.render(summary)
-        for part in _chunk_text(text):
-            await self._bot.send_message(self._target, part, parse_mode="HTML")
+            text = self._renderer.render(summary)
+            for part in _chunk_text(text):
+                await self._bot.send_message(self._target, part, parse_mode="HTML")
 
-        srt = self._artifacts / str(msg.task_id) / "transcript.srt"
-        try:
-            srt = resolve_under(self._artifacts, srt)
-        except ValueError as exc:
-            logger.error(
-                "refusing srt outside artifacts: task_id=%s error=%s",
+            srt = self._artifacts / str(msg.task_id) / "transcript.srt"
+            try:
+                srt = resolve_under(self._artifacts, srt)
+            except ValueError as exc:
+                logger.error(
+                    "refusing srt outside artifacts: task_id=%s error=%s",
+                    msg.task_id,
+                    exc,
+                )
+                return
+            if srt.exists():
+                await self._bot.send_document(
+                    self._target,
+                    BufferedInputFile(srt.read_bytes(), filename="transcript.srt"),
+                )
+            # Last log of the run in this service: same trace/task as the
+            # whole pipeline (T-1.5).
+            logger.info(
+                "result delivered: task_id=%s trace_id=%s",
                 msg.task_id,
-                exc,
+                msg.trace_id,
             )
-            return
-        if srt.exists():
-            await self._bot.send_document(
-                self._target,
-                BufferedInputFile(srt.read_bytes(), filename="transcript.srt"),
-            )
+        finally:
+            structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
 
     async def on_failed(self, msg: JobFailed) -> None:
-        await self._bot.send_message(self._target, f"⚠️ Задача упала: {msg.error}")
+        structlog.contextvars.bind_contextvars(
+            task_id=str(msg.task_id), trace_id=msg.trace_id, stage=msg.stage
+        )
+        try:
+            await self._bot.send_message(self._target, f"⚠️ Задача упала: {msg.error}")
+            logger.info(
+                "failure delivered: task_id=%s trace_id=%s stage=%s error=%s",
+                msg.task_id,
+                msg.trace_id,
+                msg.stage,
+                msg.error,
+            )
+        finally:
+            structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
 
     async def on_progress(self, msg: JobProgress) -> None:
-        label = {
-            "downloading": "⬇️ Скачиваю…",
-            "transcribing": "📝 Транскрибирую…",
-            "analyzing": "🧠 Анализирую…",
-        }.get(msg.stage, msg.stage)
-        await self._bot.send_message(self._target, f"{label} ({msg.stage})")
+        structlog.contextvars.bind_contextvars(
+            task_id=str(msg.task_id), trace_id=msg.trace_id, stage=msg.stage
+        )
+        try:
+            label = {
+                "downloading": "⬇️ Скачиваю…",
+                "transcribing": "📝 Транскрибирую…",
+                "analyzing": "🧠 Анализирую…",
+            }.get(msg.stage, msg.stage)
+            await self._bot.send_message(self._target, f"{label} ({msg.stage})")
+        finally:
+            structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
 
 
 def _kind_for(url: str) -> str:

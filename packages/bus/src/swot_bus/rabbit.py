@@ -210,6 +210,7 @@ class RabbitMessageBus:
             if trace_id:
                 self._bind_trace(trace_id)
             message = deserialize(raw.body)
+            self._bind_message_context(message)
             await handler(message)
             await raw.ack()
         except Exception:
@@ -264,6 +265,26 @@ class RabbitMessageBus:
             import structlog.contextvars  # noqa: PLC0415
 
             structlog.contextvars.bind_contextvars(trace_id=trace_id)
+        except Exception:  # noqa: BLE001
+            return
+
+    @staticmethod
+    def _bind_message_context(message: BaseMessage) -> None:
+        """Bind the message's task_id/trace_id into structlog contextvars.
+
+        Runs in the per-message dispatch task, so the binding lives exactly
+        for the duration of the handler — the consumer side of the
+        ``swot-trace-id`` round-trip (T-1.5): logs of the whole handler, incl.
+        stdlib loggers, carry the same trace_id/task_id as the publisher.
+        No-op without structlog.
+        """
+        try:
+            import structlog.contextvars  # noqa: PLC0415
+
+            structlog.contextvars.bind_contextvars(
+                task_id=str(message.task_id),
+                trace_id=message.trace_id,
+            )
         except Exception:  # noqa: BLE001
             return
 

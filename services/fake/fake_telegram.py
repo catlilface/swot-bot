@@ -4,12 +4,14 @@ Emulates the small part of the Bot API the swot-bot bot uses:
 
 * ``getMe`` — bot identity;
 * ``getUpdates`` — long-poll loop; serves updates queued via ``POST /inject``;
-* ``sendMessage`` / ``sendDocument`` — logged, return a valid ``Message``.
+* ``sendMessage`` / ``sendDocument`` — logged, return a valid ``Message``;
+* ``GET /media/sample.wav`` — a small generated WAV so the download step of
+  the pipeline works without any internet access (self-contained dev stack).
 
 E2E without a real Telegram: start the stack, then
 
     curl -X POST http://localhost:8081/inject -H 'Content-Type: application/json' \
-        -d '{"text": "https://example.com/lecture.mp4"}'
+        -d '{"text": "http://fake-tg:8081/media/sample.wav"}
 
 The fake update arrives as a message from the configured admin, the bot
 publishes ``download.request`` and later sends the summary + SRT back to the
@@ -18,11 +20,15 @@ publishes ``download.request`` and later sends the summary + SRT back to the
 
 from __future__ import annotations
 
+import io
 import json
+import math
 import os
 import re
+import struct
 import threading
 import time
+import wave
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
@@ -32,6 +38,27 @@ ADMIN_ID = int(os.environ.get("FAKE_ADMIN_ID", "12345678"))
 _state_lock = threading.Lock()
 _updates: deque[dict] = deque()
 _counters = {"update": 0, "message": 0}
+_SAMPLE_WAV: bytes | None = None
+
+
+def _sample_wav() -> bytes:
+    """Generate (once) a small 3s 440 Hz sine WAV — enough for the pipeline."""
+    global _SAMPLE_WAV
+    if _SAMPLE_WAV is None:
+        sample_rate = 16000
+        duration = 3.0
+        frames = bytearray()
+        for i in range(int(sample_rate * duration)):
+            value = int(12000 * math.sin(2 * math.pi * 440 * i / sample_rate))
+            frames += struct.pack("<h", value)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(bytes(frames))
+        _SAMPLE_WAV = buf.getvalue()
+    return _SAMPLE_WAV
 
 
 def _next_update_id() -> int:
@@ -102,6 +129,13 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_bytes(self, status: int, content_type: str, body: bytes) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -214,6 +248,11 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/healthz"):
             self._send_json(200, {"ok": True})
+            return
+        if path == "/media/sample.wav":
+            data = _sample_wav()
+            self._send_bytes(200, "audio/wav", data)
+            print(f"[fake-tg] served /media/sample.wav ({len(data)} bytes)", flush=True)
             return
         match = re.match(r"^/bot[^/]+/(\w+)$", path)
         if match is not None:
