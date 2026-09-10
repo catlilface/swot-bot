@@ -6,6 +6,8 @@ requires-python = ">=3.13"
 dependencies = [
     "structlog>=24.4",
     "aiohttp>=3.11",
+    "swot-contracts>=0.1.0",
+    "dishka>=1.10",
 ]
 
 [tool.uv]

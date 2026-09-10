@@ -8,6 +8,7 @@ from uuid import UUID
 from dishka import make_async_container
 from swot_bus import FakeBus, InMemoryJobRegistry, RegistryProvider
 from swot_contracts import DownloadRequest, JobStatus, SourceRef
+from swot_contracts.ports import JobRegistry
 from swot_downloader.domain import DownloadedMedia
 from swot_downloader.service import DownloaderService
 
@@ -80,7 +81,7 @@ async def test_dishka_fake_container_resolves_services() -> None:
         RegistryProvider(),
     )
     async with container() as request_container:
-        registry = await request_container.get(InMemoryJobRegistry)
+        registry = await request_container.get(JobRegistry)
         stubs_holder.append(registry)
     await container.close()
     assert stubs_holder, "expected registry from dishka"

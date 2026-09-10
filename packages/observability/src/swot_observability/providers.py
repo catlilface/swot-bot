@@ -1,11 +1,24 @@
-"""Dishka provider wiring observability components (HealthServer)."""
+"""Dishka providers wiring shared components (Settings, HealthServer)."""
 
 from collections.abc import AsyncIterable
 
 from dishka import Provider, Scope, provide
-from swot_contracts import Settings
+from swot_contracts import Settings, get_settings
 
 from .health import HealthServer
+
+
+class SettingsProvider(Provider):
+    """Provide the process-wide :class:`Settings` singleton (env / .env).
+
+    Every service container registers this provider so that factories
+    depending on :class:`Settings` resolve identically (``get_settings()``
+    is lru-cached — one construction per process).
+    """
+
+    @provide(scope=Scope.APP)
+    def settings(self) -> Settings:
+        return get_settings()
 
 
 class ObservabilityProvider(Provider):

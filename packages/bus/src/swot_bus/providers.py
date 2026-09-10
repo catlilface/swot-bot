@@ -9,6 +9,7 @@ from collections.abc import AsyncIterable
 
 from dishka import Provider, Scope, provide
 from swot_contracts import MessageBus, Settings
+from swot_contracts.ports import JobRegistry
 
 from .fake import FakeBus
 from .jobs import InMemoryJobRegistry
@@ -52,7 +53,7 @@ BusProvider = RabbitBusProvider
 class RegistryProvider(Provider):
     """Provide an in-memory JobRegistry by default (no Redis)."""
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=JobRegistry)
     def registry(self) -> InMemoryJobRegistry:
         return InMemoryJobRegistry()
 

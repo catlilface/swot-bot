@@ -1645,13 +1645,17 @@ version = "0.1.0"
 source = { editable = "packages/observability" }
 dependencies = [
     { name = "aiohttp" },
+    { name = "dishka" },
     { name = "structlog" },
+    { name = "swot-contracts" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11" },
+    { name = "dishka", specifier = ">=1.10" },
     { name = "structlog", specifier = ">=24.4" },
+    { name = "swot-contracts", editable = "packages/contracts" },
 ]
 
 [[package]]

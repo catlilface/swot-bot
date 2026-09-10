@@ -4,7 +4,12 @@ import asyncio
 
 from dishka import make_async_container
 from swot_bus import RabbitBusProvider, RegistryProvider
-from swot_observability import HealthServer, ObservabilityProvider, configure_logging
+from swot_observability import (
+    HealthServer,
+    ObservabilityProvider,
+    SettingsProvider,
+    configure_logging,
+)
 
 from .providers import AnalyzerAdaptersProvider, AnalyzeServiceProvider
 from .service import AnalyzeService
@@ -14,6 +19,7 @@ async def _amain() -> None:
     configure_logging()
     container = make_async_container(
         RabbitBusProvider("video.analyze", ["transcript.ready"]),
+        SettingsProvider(),
         RegistryProvider(),
         ObservabilityProvider(),
         AnalyzerAdaptersProvider(),

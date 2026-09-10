@@ -7,7 +7,12 @@ from aiogram import Dispatcher, Router
 from dishka import make_async_container
 from dishka.integrations.aiogram import setup_dishka
 from swot_bus import RabbitBusProvider, RegistryProvider
-from swot_observability import HealthServer, ObservabilityProvider, configure_logging
+from swot_observability import (
+    HealthServer,
+    ObservabilityProvider,
+    SettingsProvider,
+    configure_logging,
+)
 
 from .providers import (
     BotConsumer,
@@ -22,6 +27,7 @@ async def _amain() -> None:
         RabbitBusProvider(
             "result.deliver", ["analysis.ready", "job.failed", "job.progress"]
         ),
+        SettingsProvider(),
         RegistryProvider(),
         ObservabilityProvider(),
         BotHandlersProvider(),

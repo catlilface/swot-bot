@@ -2,11 +2,12 @@
 
 from .health import HealthServer
 from .logging_config import configure_logging, get_logger, new_trace_id
-from .providers import ObservabilityProvider
+from .providers import ObservabilityProvider, SettingsProvider
 
 __all__ = [
     "HealthServer",
     "ObservabilityProvider",
+    "SettingsProvider",
     "configure_logging",
     "get_logger",
     "new_trace_id",
