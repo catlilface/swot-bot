@@ -5,27 +5,11 @@ from pathlib import Path
 from uuid import UUID
 
 from fakes import FakeBus
+from stubs import LocalPrompt, StubSummarizer
 from swot_analyzer.domain import Fact, Section, Summary
 from swot_analyzer.service import AnalyzeService, _summary_to_dict
 from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobProgress, JobStatus, SourceRef, TranscriptReady
-
-
-class StubSummarizer:
-    async def summarize(self, transcript: str, prompt: str) -> Summary:
-        return Summary(
-            summary="Резюме",
-            sections=[
-                Section(
-                    heading="Гл1", facts=[Fact(text="Факт из транскрипта", start_sec=5)]
-                )
-            ],
-        )
-
-
-class LocalPrompt:
-    def get(self, name: str) -> str:
-        return "промпт"
 
 
 async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
@@ -77,7 +61,9 @@ def _expected_summary() -> Summary:
         title="Квантовая механика: основы",
         summary="Резюме",
         sections=[
-            Section(heading="Гл1", facts=[Fact(text="Факт из транскрипта", start_sec=5)])
+            Section(
+                heading="Гл1", facts=[Fact(text="Факт из транскрипта", start_sec=5)]
+            )
         ],
     )
 

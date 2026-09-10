@@ -211,9 +211,7 @@ async def test_bot_uses_srt_path_from_event(tmp_path: Path) -> None:
     task_id = UUID("00000000-0000-0000-0000-000000000022")
     (root / str(task_id)).mkdir(parents=True)
     (root / str(task_id) / "summary.json").write_text(
-        json.dumps(
-            {"title": "Л", "summary": "Р", "sections": []}, ensure_ascii=False
-        ),
+        json.dumps({"title": "Л", "summary": "Р", "sections": []}, ensure_ascii=False),
         encoding="utf-8",
     )
     # Транскрибер пишет SRT в своём layout: <transcriber_dir>/<task>/transcript.srt
@@ -273,22 +271,22 @@ class FlakyBot:
 class NackBus:
     """Fake bus with ack/nack semantics: handler OK → ack, raise → nack.
 
-    Mirrors RabbitMessageBus._dispatch: an unhandled handler exception means
+    Mirrors RabbitMessageBus dispatch: an unhandled handler exception means
     the message is nacked (requeue/DLQ at bus level), not swallowed.
     """
 
     def __init__(self) -> None:
-        self._handler: Callable[[Any], Awaitable[None]] | None = None
+        self.handler: Callable[[Any], Awaitable[None]] | None = None
         self.acks = 0
         self.nacks = 0
 
     async def consume(self, handler: Callable[[Any], Awaitable[None]]) -> None:
-        self._handler = handler
+        self.handler = handler
 
     async def publish(self, message: Any) -> None:
-        assert self._handler is not None
+        assert self.handler is not None
         try:
-            await self._handler(message)
+            await self.handler(message)
             self.acks += 1
         except Exception:  # noqa: BLE001 - nack semantics
             self.nacks += 1

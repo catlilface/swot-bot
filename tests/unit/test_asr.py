@@ -42,12 +42,12 @@ class _Result:
 
 class _Transcriptions:
     def __init__(self, result: _Result) -> None:
-        self._result = result
+        self.result = result
         self.calls: list[dict] = []
 
     async def create(self, **kwargs) -> _Result:
         self.calls.append(kwargs)
-        return self._result
+        return self.result
 
 
 class _Audio:

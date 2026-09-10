@@ -19,23 +19,23 @@ class FakeBus:
     def __init__(self, capture: bool = True) -> None:
         self.capture = capture
         self.published: list[BaseMessage] = []
-        self._handler: Callable[[BaseMessage], Awaitable[None]] | None = None
+        self.handler: Callable[[BaseMessage], Awaitable[None]] | None = None
 
     async def publish(self, message: BaseMessage) -> None:
         if self.capture:
             self.published.append(message)
-        if self._handler is not None:
-            await self._handler(message)
+        if self.handler is not None:
+            await self.handler(message)
 
     async def consume(self, handler: Callable[[BaseMessage], Awaitable[None]]) -> None:
-        self._handler = handler
+        self.handler = handler
 
     async def is_ready(self) -> bool:
         """The in-memory bus is always "connected"."""
         return True
 
     async def close(self) -> None:
-        self._handler = None
+        self.handler = None
 
     def published_types(self) -> list:
         return [m.msg_type for m in self.published]

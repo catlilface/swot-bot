@@ -54,6 +54,11 @@ class LlmSummarizer:
         )
         self._max_transcript_chars = max_transcript_chars
 
+    @property
+    def model(self) -> Any:
+        """LLM-клиент (read-only; тесты читают его вместо ``_model``)."""
+        return self._model
+
     async def summarize(self, transcript: str, prompt: str) -> Summary:
         if len(transcript) > self._max_transcript_chars:
             raise SummarizeError(

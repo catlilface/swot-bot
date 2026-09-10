@@ -81,54 +81,59 @@ def _cut_before(text: str, pos: int) -> int:
     return nl + 1 if nl > 0 else pos
 
 
+async def handle_link(
+    message: Message,
+    bus: FromDishka[MessageBus],
+    registry: FromDishka[JobRegistry],
+    validator: FromDishka[UrlValidator],
+) -> None:
+    """Одиночное текстовое сообщение трактуется как ссылка на видео.
+
+    Module-level function (not nested in ``build_router``) so the
+    validation branches are directly unit-testable (T-2.7).
+    """
+    user_text = (message.text or "").strip()
+    if not user_text.startswith(("http://", "https://")):
+        await message.answer("Пришли ссылку на лекцию.")
+        return
+    try:
+        url = validator.validate(user_text)
+    except ValueError as exc:
+        await message.answer(str(exc))
+        return
+
+    task_id = uuid4()
+    trace_id = f"t-{task_id.hex[:12]}"
+    # Bind BEFORE the first publish so the swot-trace-id header and the
+    # bot's own logs carry the run's context (T-1.5).
+    structlog.contextvars.bind_contextvars(
+        task_id=str(task_id), trace_id=trace_id, stage="new"
+    )
+    try:
+        logger.info(
+            "link received: task_id=%s trace_id=%s url=%s",
+            task_id,
+            trace_id,
+            user_text,
+        )
+        await registry.create(task_id, url)
+        await bus.publish(
+            DownloadRequest(
+                task_id=task_id,
+                trace_id=trace_id,
+                source=SourceRef(url=url, kind=_kind_for(url)),
+            )
+        )
+        await message.answer("✅ Задача принята, обрабатываю…")
+    finally:
+        structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
+
+
 def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
     """Create a router bound to the admin filter (admin_id from config)."""
     admin_filter = IsAdmin(admin_id)
     router = Router(name="main")
-
-    @router.message(admin_filter, F.text)
-    async def handle_link(
-        message: Message,
-        bus: FromDishka[MessageBus],
-        registry: FromDishka[JobRegistry],
-        validator: FromDishka[UrlValidator],
-    ) -> None:
-        user_text = (message.text or "").strip()
-        if not user_text.startswith(("http://", "https://")):
-            await message.answer("Пришли ссылку на лекцию.")
-            return
-        try:
-            url = validator.validate(user_text)
-        except ValueError as exc:
-            await message.answer(str(exc))
-            return
-
-        task_id = uuid4()
-        trace_id = f"t-{task_id.hex[:12]}"
-        # Bind BEFORE the first publish so the swot-trace-id header and the
-        # bot's own logs carry the run's context (T-1.5).
-        structlog.contextvars.bind_contextvars(
-            task_id=str(task_id), trace_id=trace_id, stage="new"
-        )
-        try:
-            logger.info(
-                "link received: task_id=%s trace_id=%s url=%s",
-                task_id,
-                trace_id,
-                user_text,
-            )
-            await registry.create(task_id, url)
-            await bus.publish(
-                DownloadRequest(
-                    task_id=task_id,
-                    trace_id=trace_id,
-                    source=SourceRef(url=url, kind=_kind_for(url)),
-                )
-            )
-            await message.answer("✅ Задача принята, обрабатываю…")
-        finally:
-            structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
-
+    router.message.register(handle_link, admin_filter, F.text)
     return router, admin_filter
 
 

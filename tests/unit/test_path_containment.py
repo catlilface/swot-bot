@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fakes import FakeBus
+from stubs import LocalPrompt, StubExtractor, StubSummarizer, StubTranscriber
 from swot_analyzer.service import AnalyzeService
 from swot_bot.handlers import ResultReporter
 from swot_bus import InMemoryJobRegistry
@@ -88,28 +89,13 @@ def test_resolve_under_symlink_inside_ok(tmp_path: Path) -> None:
 # --- analyzer -------------------------------------------------------------
 
 
-class _StubPrompt:
-    def get(self, name: str) -> str:
-        return "prompt"
-
-
-class _StubSummarizer:
-    async def summarize(self, transcript: str, prompt: str) -> Any:
-        from swot_analyzer.domain import Fact, Section, Summary
-
-        return Summary(
-            summary="Резюме",
-            sections=[Section(heading="Гл1", facts=[Fact(text="Факт", start_sec=5)])],
-        )
-
-
 def _make_analyzer(
     tmp_path: Path, bus: FakeBus, registry: InMemoryJobRegistry
 ) -> AnalyzeService:
     return AnalyzeService(
         prompt_name="lecture-summary",
-        prompt_provider=_StubPrompt(),  # type: ignore[arg-type]
-        summarizer=_StubSummarizer(),  # type: ignore[arg-type]
+        prompt_provider=LocalPrompt(),  # type: ignore[arg-type]
+        summarizer=StubSummarizer(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
         artifacts_dir=str(tmp_path / "artifacts"),
@@ -267,27 +253,6 @@ async def test_bot_happy_path_sends_text_and_srt(tmp_path: Path) -> None:
 # --- transcriber ------------------------------------------------------------
 
 
-class _StubExtractor:
-    async def extract(self, media: Path, out: Path) -> Path:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(b"wav")
-        return out
-
-
-class _StubTranscriber:
-    async def transcribe(self, audio: Path, out_dir: Path) -> Any:
-        from swot_transcriber.domain import TranscriptResult
-
-        out_dir.mkdir(parents=True, exist_ok=True)
-        srt = out_dir / "transcript.srt"
-        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nТ\n", encoding="utf-8")
-        segs = out_dir / "segments.json"
-        segs.write_text("[]", encoding="utf-8")
-        return TranscriptResult(
-            base_dir=out_dir, srt_path=srt, segments_path=segs, language="ru"
-        )
-
-
 @pytest.mark.asyncio
 async def test_transcriber_does_not_delete_media_outside_media_dir(
     tmp_path: Path,
@@ -301,8 +266,8 @@ async def test_transcriber_does_not_delete_media_outside_media_dir(
     registry = InMemoryJobRegistry()
     svc = TranscribeService(
         artifacts_dir=str(tmp_path / "artifacts"),
-        extractor=_StubExtractor(),
-        transcriber=_StubTranscriber(),  # type: ignore[arg-type]
+        extractor=StubExtractor(),
+        transcriber=StubTranscriber(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
         media_dir=str(media_dir),

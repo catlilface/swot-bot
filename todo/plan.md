@@ -437,11 +437,11 @@
   ответ), `on_analysis/on_failed/on_progress` (с фейком `message.answer`);
   (4) публичный API вместо `svc._cleanup_old_artifacts`.
 - Приёмка:
-  - [ ] Тесты round-trip зелёные; неизвестный `type` → `ValueError`/`JobFailed`.
-  - [ ] `grep -rn "StubRouter\|StubExtractor\|StubTranscriber" tests` — определение
+  - [x] Тесты round-trip зелёные; неизвестный `type` → `ValueError`/`JobFailed`.
+  - [x] `grep -rn "StubRouter\|StubExtractor\|StubTranscriber" tests` — определение
         встречается один раз (общий модуль).
-  - [ ] `grep -rn "\._[a-z]" tests/` — обращения к приватным методам отсутствуют.
-  - [ ] Хендлеры бота покрыты тестами (покрытие `swot_bot/handlers.py` ≥ 80%).
+  - [x] `grep -rn "\._[a-z]" tests/` — обращения к приватным методам отсутствуют.
+  - [x] Хендлеры бота покрыты тестами (покрытие `swot_bot/handlers.py` ≥ 80%).
 
 ### T-2.8 Docker/compose-гигиена
 - Находки: P2-8, P2-13, P2-14. Зависимости: T-0.2, T-0.5.

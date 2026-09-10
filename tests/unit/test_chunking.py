@@ -46,15 +46,9 @@ class _SegmentedClient:
 
     def __init__(self) -> None:
         type(self).calls = []
-        self._audio = SimpleNamespace(
-            transcriptions=SimpleNamespace(create=self._create)
-        )
+        self.audio = SimpleNamespace(transcriptions=SimpleNamespace(create=self.create))
 
-    @property
-    def audio(self):
-        return self._audio
-
-    async def _create(self, **kwargs) -> _Result:
+    async def create(self, **kwargs) -> _Result:
         type(self).calls.append(kwargs)
         return _Result("ru")
 
@@ -228,11 +222,11 @@ class _FakeRunnable:
     """
 
     def __init__(self, llm: "_FakeLLM") -> None:
-        self._llm = llm
+        self.llm = llm
 
     async def __call__(self, inputs) -> Summary:
         text = _prompt_text(inputs)
-        self._llm.inputs.append(text)
+        self.llm.inputs.append(text)
         if '"sections"' in text:  # reduce: JSON-массив частичных summary в промпте
             partials = _reduce_partials(inputs)
             facts: list[Fact] = []
@@ -369,6 +363,6 @@ def test_chatopenai_gets_max_tokens_and_timeout() -> None:
         max_tokens=4096,
         timeout_sec=120,
     )
-    model = summarizer._model  # noqa: SLF001
+    model = summarizer.model
     assert model.max_tokens == 4096
     assert model.request_timeout == 120

@@ -7,10 +7,10 @@ from uuid import UUID
 
 from dishka import make_async_container
 from fakes import FakeBus
+from stubs import StubRouter
 from swot_bus import InMemoryJobRegistry, RegistryProvider
 from swot_contracts import DownloadRequest, JobProgress, JobStatus, SourceRef
 from swot_contracts.ports import JobRegistry
-from swot_downloader.domain import DownloadedMedia
 from swot_downloader.service import DownloaderService
 
 
@@ -42,21 +42,6 @@ async def test_dirs_ttl_cleanup_media_and_artifacts(tmp_path: Path) -> None:
     # свежие на месте
     assert (media / "fresh").exists()
     assert (artifacts / "fresh").exists()
-
-
-class StubRouter:
-    """Synchronous stand-in for SourceRouter that writes a fake file."""
-
-    def __init__(self, tmp_path: Path) -> None:
-        self._tmp = tmp_path
-
-    async def download(self, source: SourceRef, dst_dir: Path) -> DownloadedMedia:
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        f = dst_dir / "media.m4a"
-        f.write_bytes(b"fake-audio")
-        return DownloadedMedia(
-            media_path=f, title="stub", duration_sec=60, resource_id="r1"
-        )
 
 
 async def test_downloader_publishes_video_downloaded(tmp_path: Path) -> None:
