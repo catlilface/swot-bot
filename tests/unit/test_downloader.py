@@ -13,27 +13,34 @@ from swot_downloader.domain import DownloadedMedia
 from swot_downloader.service import DownloaderService
 
 
-async def test_artifacts_ttl_cleanup(tmp_path: Path) -> None:
+async def test_dirs_ttl_cleanup_media_and_artifacts(tmp_path: Path) -> None:
+    """Старые каталоги в media_dir И artifacts_dir старше TTL удаляются; свежие — нет."""
+    media = tmp_path / "media"
     artifacts = tmp_path / "artifacts"
-    old = artifacts / "old"
-    fresh = artifacts / "fresh"
-    old.mkdir(parents=True)
-    fresh.mkdir(parents=True)
-    (old / "summary.json").write_text("{}", encoding="utf-8")
-    (fresh / "summary.json").write_text("{}", encoding="utf-8")
+    for root in (media, artifacts):
+        for name in ("old", "fresh"):
+            d = root / name
+            d.mkdir(parents=True)
+            (d / "f.txt").write_text("x", encoding="utf-8")
     past = time.time() - 200 * 3600  # старше 7 дней
-    os.utime(old, (past, past))
+    for root in (media, artifacts):
+        os.utime(root / "old", (past, past))
     svc = DownloaderService(
-        media_dir=str(tmp_path),
+        media_dir=str(media),
         router=StubRouter(tmp_path),  # type: ignore[arg-type]
         bus=FakeBus(),  # type: ignore[arg-type]
         registry=InMemoryJobRegistry(),  # type: ignore[arg-type]
         artifacts_dir=str(artifacts),
         retention_hours=168,
     )
-    await svc._cleanup_old_artifacts(168)
-    assert not old.exists()
-    assert fresh.exists()
+    removed = svc.cleanup_old_dirs()
+    assert removed == 2
+    # старые удалены (и в media, и в artifacts)
+    assert not (media / "old").exists()
+    assert not (artifacts / "old").exists()
+    # свежие на месте
+    assert (media / "fresh").exists()
+    assert (artifacts / "fresh").exists()
 
 
 class StubRouter:

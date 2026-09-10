@@ -1,0 +1,12 @@
+[project]
+name = "swot-fake"
+version = "0.1.0"
+description = "Stdlib-only dev stubs: OpenAI-compatible ASR/LLM fakes + Telegram Bot API fake"
+requires-python = ">=3.13"
+dependencies = []
+
+# Not an installable package: the stubs are run directly
+# (python fake_openai.py / python fake_telegram.py) and are copied into the
+# swot-bot/fake docker image, so uv must not build/install them.
+[tool.uv]
+package = false

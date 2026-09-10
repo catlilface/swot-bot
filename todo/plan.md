@@ -174,13 +174,19 @@
   `JobFailed("timeout")`; (3) TTL-чистка `InMemoryJobRegistry` (TTL после FINAL) и
   каталогов `media_dir`/`artifacts_dir` (один utility, не только artifacts).
 - Приёмка:
-  - [ ] Тест: сообщение с payload-ом, ломающим десериализацию → после N попыток
+  - [x] Тест: сообщение с payload-ом, ломающим десериализацию → после N попыток
         попадает в `dlq`-очередь (не теряется: в очереди DLQ есть сообщение).
-  - [ ] Тест reaper: задача, «застрявшая» в DOWNLOADING дольше TTL → публикуется
+        (`tests/unit/test_dlq.py` — живая проверка по RabbitMQ из compose;
+        миграция legacy-очередей без DLQ-аргументов подтверждена в логах стэка)
+  - [x] Тест reaper: задача, «застрявшая» в DOWNLOADING дольше TTL → публикуется
         `JobFailed` со стадией и причиной.
-  - [ ] Тест чистки: старые каталоги в `media_dir` **и** `artifacts_dir` старше TTL
+        (`tests/unit/test_reaper.py` — 6 тестов: stage="download", "timeout" в error)
+  - [x] Тест чистки: старые каталоги в `media_dir` **и** `artifacts_dir` старше TTL
         удаляются; свежие — нет.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+        (`test_downloader.py::test_dirs_ttl_cleanup_media_and_artifacts`; TTL finals —
+        `test_reaper.py`)
+  - [x] `uv run pytest tests/ -q` — зелёные.
+        (76 тестов; `ruff check`/`format --check` — чисто; compose-стек 8/8 healthy)
 
 ### T-1.3 Скорость/блокировки скачивания
 - Находки: P1-3, P1-4, P2-18. Зависимости: T-0.3.

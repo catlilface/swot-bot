@@ -44,12 +44,19 @@ class Job(Protocol):
 
 
 class JobRegistry(Protocol):
-    """Track task lifecycle (idempotency + status). In-memory by default."""
+    """Track task lifecycle (idempotency + status). In-memory by default.
+
+    ``stuck_tasks``/``purge_final`` support the reaper (P1-5): tasks stuck in a
+    non-final status past TTL are failed with a timeout, and final entries are
+    forgotten after TTL so the registry does not grow unbounded.
+    """
 
     async def create(self, task_id: UUID, source_url: str) -> None: ...
     async def exists(self, task_id: UUID) -> bool: ...
     async def set_status(self, task_id: UUID, status: JobStatus) -> None: ...
     async def get_status(self, task_id: UUID) -> JobStatus | None: ...
+    async def stuck_tasks(self, ttl_sec: float) -> list[tuple[UUID, JobStatus]]: ...
+    async def purge_final(self, ttl_sec: float) -> int: ...
 
 
 __all__ = ["Job", "JobRegistry", "JobStatus", "MessageBus"]

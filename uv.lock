@@ -9,6 +9,7 @@ members = [
     "swot-bus",
     "swot-contracts",
     "swot-downloader",
+    "swot-fake",
     "swot-observability",
     "swot-transcriber",
     "swot-workspace",
@@ -1638,6 +1639,11 @@ requires-dist = [
     { name = "swot-observability", editable = "packages/observability" },
     { name = "yt-dlp", specifier = ">=2025.6.30" },
 ]
+
+[[package]]
+name = "swot-fake"
+version = "0.1.0"
+source = { virtual = "services/fake" }
 
 [[package]]
 name = "swot-observability"

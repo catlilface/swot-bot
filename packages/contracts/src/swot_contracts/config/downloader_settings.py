@@ -12,7 +12,7 @@ class DownloaderSettings(BaseSettings):
     """Video download limits (DOWNLOADER__*).
 
     ``DOWNLOADER__ALLOWED_SOURCES``, ``DOWNLOADER__MAX_VIDEO_DURATION_SEC``,
-    ``DOWNLOADER__RETENTION_HOURS``.
+    ``DOWNLOADER__RETENTION_HOURS``, ``DOWNLOADER__JOB_TIMEOUT_HOURS``.
     """
 
     model_config = SettingsConfigDict(
@@ -27,3 +27,4 @@ class DownloaderSettings(BaseSettings):
     )
     max_video_duration_sec: int = 7200  # skip longer videos
     retention_hours: int = 168  # keep unprocessed artifacts for N hours
+    job_timeout_hours: float = 6.0  # stuck (non-final) tasks fail after N hours
