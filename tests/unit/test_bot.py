@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+import pytest
 from aiogram.exceptions import TelegramRetryAfter
 from aiogram.methods import GetMe
 from swot_bot.handlers import ResultReporter, _chunk_text, _kind_for
@@ -38,6 +39,29 @@ def test_url_validator_accepts_any_source() -> None:
         pass
     else:
         raise AssertionError("ftp must be rejected")
+
+
+def test_url_validator_normalizes_netloc() -> None:
+    """T-2.5: субдомен и стандартный порт не ломают логическое совпадение."""
+    v = UrlValidator("youtube.com,rutube.ru")
+    # субдомен разрешённого домена
+    assert v.validate("https://m.youtube.com/watch?v=1")
+    # стандартный порт схемы — тот же endpoint
+    assert v.validate("https://youtube.com:443/watch?v=1")
+    # регистр не важен
+    assert v.validate("https://M.YOUTUBE.COM/watch?v=1")
+    # нестандартный порт — другой endpoint, не совпадает
+    with pytest.raises(ValueError):
+        v.validate("https://youtube.com:8443/x")
+    # ни суффикс, ни субдомен разрешённого домена
+    with pytest.raises(ValueError):
+        v.validate("https://youtu.be/abc")
+    # граница суффикса: notyoutube.com НЕ субдомен youtube.com
+    with pytest.raises(ValueError):
+        v.validate("https://notyoutube.com/x")
+    # другой домен
+    with pytest.raises(ValueError):
+        v.validate("https://malicious.com/x")
 
 
 def test_chunk_text_limits() -> None:

@@ -109,6 +109,54 @@ async def test_downloader_publishes_job_progress(tmp_path: Path) -> None:
     assert progress.trace_id == "t-10"
 
 
+async def test_downloader_revalidates_source_against_allowlist(tmp_path: Path) -> None:
+    """T-2.5: source из события повторно валидуется — вне allowlist → JobFailed."""
+    bus = FakeBus()
+    registry = InMemoryJobRegistry()
+    task_id = UUID("00000000-0000-0000-0000-000000000011")
+    svc = DownloaderService(
+        media_dir=str(tmp_path),
+        router=StubRouter(tmp_path),  # type: ignore[arg-type]
+        bus=bus,  # type: ignore[arg-type]
+        registry=registry,  # type: ignore[arg-type]
+        allowed_sources="disk.yandex.ru",
+    )
+    await svc.handle(
+        DownloadRequest(
+            task_id=task_id,
+            trace_id="t-11",
+            source=SourceRef(url="https://evil.com/x.mp4", kind="direct"),
+        )
+    )
+    # Скачивание не предпринималось: опубликован только JobFailed.
+    failed = bus.get(0)
+    assert failed.msg_type.value == "job.failed"
+    assert failed.stage == "download"
+    assert len(bus.published) == 1
+    assert await registry.get_status(task_id) == JobStatus.FAILED
+
+
+async def test_downloader_allows_source_in_allowlist(tmp_path: Path) -> None:
+    """T-2.5: source в allowlist (включая субдомен) проходит до скачивания."""
+    bus = FakeBus()
+    task_id = UUID("00000000-0000-0000-0000-000000000012")
+    svc = DownloaderService(
+        media_dir=str(tmp_path),
+        router=StubRouter(tmp_path),  # type: ignore[arg-type]
+        bus=bus,  # type: ignore[arg-type]
+        registry=InMemoryJobRegistry(),  # type: ignore[arg-type]
+        allowed_sources="yandex.ru",
+    )
+    await svc.handle(
+        DownloadRequest(
+            task_id=task_id,
+            trace_id="t-12",
+            source=SourceRef(url="https://disk.yandex.ru/i/abc", kind="yandex_disk"),
+        )
+    )
+    assert "video.downloaded" in [t.value for t in bus.published_types()]
+
+
 async def test_dishka_fake_container_resolves_services() -> None:
     stubs_holder: list[object] = []
     container = make_async_container(

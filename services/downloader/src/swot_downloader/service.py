@@ -14,9 +14,11 @@ from typing import TYPE_CHECKING
 from swot_contracts import (
     BaseMessage,
     DownloadRequest,
+    JobFailed,
     JobProgress,
     JobStatus,
     MessageBus,
+    UrlValidator,
     VideoDownloaded,
 )
 from swot_contracts.ports import JobRegistry
@@ -50,9 +52,12 @@ class DownloaderService:
         artifacts_dir: str | None = None,
         retention_hours: int = 168,
         job_timeout_hours: float = 6.0,
+        allowed_sources: str = "",
     ) -> None:
         self._media_dir = Path(media_dir)
         self._router = router
+        # T-2.5: defense in depth — тот же валидатор, что и в боте.
+        self._validator = UrlValidator(allowed_sources)
         self._bus = bus
         self._registry = registry
         self._max_duration_sec = max_duration_sec
@@ -61,6 +66,28 @@ class DownloaderService:
         self._job_timeout_sec = job_timeout_hours * 3600
 
     async def handle(self, message: DownloadRequest) -> None:
+        """Обработка запроса: повторная валидация источника, скачивание."""
+        # T-2.5: source из события повторно валидуется — событие могло прийти
+        # не от бота, и allowlist на стороне бота это не покрывает.
+        try:
+            self._validator.validate(message.source.url)
+        except ValueError as exc:
+            logger.warning(
+                "source outside allowlist, refusing: task_id=%s url=%s (%s)",
+                message.task_id,
+                message.source.url,
+                exc,
+            )
+            await self._bus.publish(
+                JobFailed(
+                    task_id=message.task_id,
+                    trace_id=message.trace_id,
+                    stage="download",
+                    error=str(exc),
+                )
+            )
+            await self._registry.set_status(message.task_id, JobStatus.FAILED)
+            return
         await self._registry.set_status(message.task_id, JobStatus.DOWNLOADING)
         await self._bus.publish(
             JobProgress(
@@ -99,8 +126,6 @@ class DownloaderService:
                 message.task_id,
                 message.trace_id,
             )
-            from swot_contracts import JobFailed
-
             await self._bus.publish(
                 JobFailed(
                     task_id=message.task_id,

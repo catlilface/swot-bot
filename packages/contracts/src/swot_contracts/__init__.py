@@ -26,6 +26,7 @@ from .events import (
 )
 from .paths import resolve_under
 from .ports import JobRegistry, JobStatus, MessageBus
+from .urls import UrlValidator
 
 __all__ = [
     "AnalysisFailed",
@@ -50,6 +51,7 @@ __all__ = [
     "TranscriptFailed",
     "TranscriptReady",
     "TranscriberSettings",
+    "UrlValidator",
     "VideoDownloaded",
     "get_settings",
 ]

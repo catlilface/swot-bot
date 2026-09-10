@@ -52,5 +52,7 @@ class DownloaderServiceProvider(Provider):
             artifacts_dir=settings.artifacts_dir,
             retention_hours=settings.downloader.retention_hours,
             job_timeout_hours=settings.downloader.job_timeout_hours,
+            # T-2.5: тот же allowlist, что и у бота (DOWNLOADER__ALLOWED_SOURCES).
+            allowed_sources=settings.downloader.allowed_sources,
         )
         yield svc

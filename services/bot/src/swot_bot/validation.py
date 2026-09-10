@@ -1,24 +1,10 @@
-"""URL validation for submitted links (any source allowed by default)."""
+"""URL validation for bot commands.
 
-from urllib.parse import urlparse
+T-2.5: the validator itself lives in ``swot_contracts.urls`` — the downloader
+re-validates submitted sources with the very same class (defense in depth).
+This module re-exports it, keeping ``swot_bot.validation`` import-compatible.
+"""
 
+from swot_contracts.urls import UrlValidator
 
-class UrlValidator:
-    """Accept any http(s) URL; optional host allowlist from env."""
-
-    def __init__(self, allowed_hosts: str = "") -> None:
-        self._allowed = {
-            h.strip().lower() for h in allowed_hosts.split(",") if h.strip()
-        }
-
-    def validate(self, url: str) -> str:
-        if len(url) > 2048:
-            raise ValueError("URL слишком длинный")
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError("Поддерживаются только http/https ссылки")
-        if not parsed.netloc:
-            raise ValueError("Невалидная ссылка")
-        if self._allowed and parsed.netloc.lower() not in self._allowed:
-            raise ValueError("Домен не в списке разрешённых")
-        return url
+__all__ = ["UrlValidator"]

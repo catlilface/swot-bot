@@ -402,16 +402,18 @@
 
 ### T-2.5 UrlValidator: нормализация и повторная валидация
 - Находки: P2-7. Зависимости: нет.
-- Scope: `swot_bot/validation.py`, `swot_downloader/service.py`.
+- Scope: `swot_contracts/urls.py` (общий валидатор, T-2.5: downloader не зависит
+  от `swot_bot`), `swot_bot/validation.py` (re-export), `swot_downloader/service.py`,
+  `swot_downloader/providers.py`.
 - Работа: нормализация netloc (strip порта по дефолту схемы, суффикс-совпадение
   субдоменов); в downloader — повторная проверка `source` через тот же валидатор
   (defense in depth).
 - Приёмка:
-  - [ ] Тесты: `m.youtube.com`, `youtube.com:443` → разрешены; `youtu.be`/
+  - [x] Тесты: `m.youtube.com`, `youtube.com:443` → разрешены; `youtu.be`/
         `malicious.com` → отвергнуты (те же + новые кейсы).
-  - [ ] Тест: downloader получает событие с `source="https://evil.com/x.mp4"` →
+  - [x] Тест: downloader получает событие с `source="https://evil.com/x.mp4"` →
         `JobFailed` (валидация на стороне downloader), даже если бот не проверил.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+  - [x] `uv run pytest tests/ -q` — зелёные.
 
 ### T-2.6 Документация
 - Находки: P2-11, P0-5 (README). Зависимости: T-0.5 (quickstart).
