@@ -94,6 +94,10 @@ class RabbitMessageBus:
             )
         return self
 
+    async def is_ready(self) -> bool:
+        """Readiness probe: a live (not closed) connection to the broker."""
+        return self._connection is not None and not self._connection.is_closed
+
     async def _open_channel(self) -> Any:
         if self._connection is None:
             msg = "bus not connected"

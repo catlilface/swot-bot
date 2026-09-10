@@ -26,6 +26,10 @@ class FakeBus:
     async def consume(self, handler: Callable[[BaseMessage], Awaitable[None]]) -> None:
         self._handler = handler
 
+    async def is_ready(self) -> bool:
+        """The in-memory bus is always "connected"."""
+        return True
+
     async def close(self) -> None:
         self._handler = None
 

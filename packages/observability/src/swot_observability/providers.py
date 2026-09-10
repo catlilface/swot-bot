@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterable
 
 from dishka import Provider, Scope, provide
-from swot_contracts import Settings, get_settings
+from swot_contracts import MessageBus, Settings, get_settings
 
 from .health import HealthServer
 
@@ -22,9 +22,16 @@ class SettingsProvider(Provider):
 
 
 class ObservabilityProvider(Provider):
-    """Provide an aiohttp HealthServer on HEALTH_PORT (APP-scoped)."""
+    """Provide an aiohttp HealthServer on HEALTH_PORT (APP-scoped).
+
+    ``/readyz`` reports ``degraded`` (503) until the :class:`MessageBus`
+    readiness probe (``is_ready`` — for RabbitMQ: a live connection to the
+    broker) turns true (T-1.6).
+    """
 
     @provide(scope=Scope.APP)
-    async def health_server(self, settings: Settings) -> AsyncIterable[HealthServer]:
-        server = HealthServer(port=settings.health_port)
+    async def health_server(
+        self, settings: Settings, bus: MessageBus
+    ) -> AsyncIterable[HealthServer]:
+        server = HealthServer(port=settings.health_port, readiness=bus.is_ready)
         yield server

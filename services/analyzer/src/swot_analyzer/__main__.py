@@ -9,6 +9,7 @@ from swot_observability import (
     ObservabilityProvider,
     SettingsProvider,
     configure_logging,
+    run_until_shutdown,
 )
 
 from .providers import AnalyzerAdaptersProvider, AnalyzeServiceProvider
@@ -25,15 +26,19 @@ async def _amain() -> None:
         AnalyzerAdaptersProvider(),
         AnalyzeServiceProvider(),
     )
+    health: HealthServer | None = None
     try:
         async with container() as request_container:
-            health: HealthServer = await request_container.get(HealthServer)
-            health_task = asyncio.create_task(health.start())
+            health = await request_container.get(HealthServer)
+            await health.start()
             service = await request_container.get(AnalyzeService)
-            await service.run()
-            health_task.cancel()
+            # T-1.6: SIGTERM/SIGINT → stop consuming (drain in-flight in
+            # bus.close below) → close bus → stop health server → exit 0.
+            await run_until_shutdown(service.run())
     finally:
         await container.close()
+        if health is not None:
+            await health.stop()
 
 
 def main() -> None:

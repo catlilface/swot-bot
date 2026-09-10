@@ -275,11 +275,20 @@
   `RabbitMessageBus.connect()`); порядок shutdown: SIGTERM → drain consume → close bus
   → stop health → exit 0.
 - Приёмка:
-  - [ ] Тест: до `connect()` `/readyz` → `{"status":"degraded"}`; после — `ok`.
-  - [ ] Тест: `SIGTERM` в процессе consume → процесс завершается кодом 0 за
+  - [x] Тест: до `connect()` `/readyz` → `{"status":"degraded"}`; после — `ok`.
+        (`tests/unit/test_health.py::test_readyz_reflects_readiness_and_healthz_stop` —
+        до готовности 503/degraded, после 200/ok; `test_rabbit_bus_is_ready_live` —
+        `is_ready()` False до connect(), True после, False после close().)
+  - [x] Тест: `SIGTERM` в процессе consume → процесс завершается кодом 0 за
         < grace period, очередь ack'нуты/рекею-нуты корректно (тест на FakeBus/
         RabbitMessageBus с локальным брокером в CI).
-  - [ ] Compose: `docker compose stop bot` → контейнер уходит без `Killed`.
+        (`test_inflight_drained_on_close_live` — close() дожидается in-flight,
+        очередь пуста (ack, не потеря); `test_worker_sigterm_exits_zero_live` —
+        SIGTERM `python -m swot_downloader` → exit 0 за 30s; `test_bot_sigterm_exits_zero_live` —
+        то же для бота с fake-tg; live-тесты skip без брокера.)
+  - [x] Compose: `docker compose stop bot` → контейнер уходит без `Killed`.
+        (проверено: `docker compose stop bot downloader` → оба `State.ExitCode=0`,
+        логи: `shutdown: N work task(s) stopped` → `health server stopped`, без Killed.)
 
 ### T-1.7 Доставка результата в Telegram
 - Находки: P1-10. Зависимости: T-0.6.

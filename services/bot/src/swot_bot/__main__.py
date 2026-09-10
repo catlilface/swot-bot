@@ -12,6 +12,7 @@ from swot_observability import (
     ObservabilityProvider,
     SettingsProvider,
     configure_logging,
+    run_until_shutdown,
 )
 
 from .providers import (
@@ -33,24 +34,31 @@ async def _amain() -> None:
         BotHandlersProvider(),
         BotConsumersProvider(),
     )
+    health: HealthServer | None = None
     try:
         async with container() as request_container:
             bot = await request_container.get(aiogram.Bot)
             router = await request_container.get(Router)
             consumer = await request_container.get(BotConsumer)
-            health: HealthServer = await request_container.get(HealthServer)
+            health = await request_container.get(HealthServer)
 
             dp = Dispatcher()
             dp.include_router(router)
             setup_dishka(container=container, router=dp, auto_inject=True)
 
-            await asyncio.gather(
-                dp.start_polling(bot),
+            await health.start()
+            # T-1.6: SIGTERM/SIGINT → stop polling/consuming (aiogram's own
+            # finally closes the bot session; drain in-flight in bus.close
+            # below) → close bus → stop health server → exit 0.
+            await run_until_shutdown(
+                dp.start_polling(bot, handle_signals=False),
                 consumer(),
-                health.start(),
             )
+            await bot.session.close()
     finally:
         await container.close()
+        if health is not None:
+            await health.stop()
 
 
 def main() -> None:
