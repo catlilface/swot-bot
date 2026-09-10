@@ -9,6 +9,7 @@ from swot_contracts import (
     JobStatus,
     MessageBus,
     VideoDownloaded,
+    resolve_under,
 )
 from swot_contracts.ports import JobRegistry
 
@@ -30,8 +31,10 @@ class TranscribeService:
         transcriber: "Transcriber",
         bus: MessageBus,
         registry: JobRegistry,
+        media_dir: str,
     ) -> None:
         self._artifacts_dir = Path(artifacts_dir)
+        self._media_dir = Path(media_dir)
         self._extractor = extractor
         self._transcriber = transcriber
         self._bus = bus
@@ -48,9 +51,8 @@ class TranscribeService:
         try:
             work = out_dir / "work"
             work.mkdir(parents=True, exist_ok=True)
-            audio = await self._extractor.extract(
-                Path(message.media_path), work / "audio.wav"
-            )
+            media = resolve_under(self._media_dir, message.media_path)
+            audio = await self._extractor.extract(media, work / "audio.wav")
             result = await self._transcriber.transcribe(audio, out_dir)
 
             from swot_contracts import TranscriptReady
@@ -74,7 +76,7 @@ class TranscribeService:
                 message.trace_id,
                 result.srt_path,
             )
-            self._cleanup_media(message.media_path)
+            self._cleanup_media(media, self._media_dir)
         except Exception as exc:  # noqa: BLE001
             logger.exception(
                 "transcribe failed: task_id=%s trace_id=%s",
@@ -94,10 +96,22 @@ class TranscribeService:
             await self._registry.set_status(message.task_id, JobStatus.FAILED)
 
     @staticmethod
-    def _cleanup_media(media_path: str) -> None:
-        """Remove the downloaded media once transcription is done (best-effort)."""
+    def _cleanup_media(media_path: str | Path, media_dir: str | Path) -> None:
+        """Remove the downloaded media once transcription is done (best-effort).
+
+        Refuses to touch anything outside *media_dir* (P0-6).
+        """
         try:
-            Path(media_path).unlink(missing_ok=True)
+            resolved = resolve_under(media_dir, media_path)
+        except ValueError as exc:
+            logger.warning(
+                "media cleanup refused (outside media dir): path=%s error=%s",
+                media_path,
+                exc,
+            )
+            return
+        try:
+            resolved.unlink(missing_ok=True)
         except OSError as exc:
             logger.warning("media cleanup failed: path=%s error=%s", media_path, exc)
 

@@ -101,6 +101,7 @@ async def test_full_pipeline_end_to_end(tmp_path: Path) -> None:
         transcriber=StubTranscriber(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
+        media_dir=str(media_dir),
     )
     analyzer = AnalyzeService(
         prompt_name="lecture-summary",
@@ -108,6 +109,7 @@ async def test_full_pipeline_end_to_end(tmp_path: Path) -> None:
         summarizer=StubSummarizer(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
+        artifacts_dir=str(artifacts_dir),
     )
 
     async def router(message: BaseMessage) -> None:

@@ -123,19 +123,21 @@
   analyzer (`base_dir`, `srt_path`), bot (`summary_path`), transcriber (`media_path`).
   До готовности — минимум: суффиксы `*.json/*.srt/*.txt` + reject абсолютных/`..`.
 - Приёмка:
-  - [ ] Тесты helper: `../etc/passwd`, `/etc/passwd`, symlink-ссылка наружу →
+  - [x] Тесты helper: `../etc/passwd`, `/etc/passwd`, symlink-ссылка наружу →
         `ValueError` (или `JobFailed` на уровне сервиса); `base/sub/file.txt` — ок.
-  - [ ] Analyzer: событие с `base_dir="../../"` → `summary.json` **не** создается вне
+        (helper в `swot_contracts/paths.py` + тесты в `tests/unit/test_path_containment.py`)
+  - [x] Analyzer: событие с `base_dir="../../"` → `summary.json` **не** создается вне
         `artifacts_dir`, задача → FAILED с понятной ошибкой.
-  - [ ] Bot: событие с `summary_path="/etc/passwd"` → сообщение не падает, логирует
+  - [x] Bot: событие с `summary_path="/etc/passwd"` → сообщение не падает, логирует
         ошибку, файл не читается.
-  - [ ] Transcriber: `media_path` вне `media_dir` → файл не удаляется.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+  - [x] Transcriber: `media_path` вне `media_dir` → файл не удаляется.
+  - [x] `uv run pytest tests/ -q` — зелёные. (64 unit-тестов, `ruff check`/`format` — чисто;
+        E2E: сквозной прогон через compose с containment-кодом — trace t-dd27cdeecb50)
 
 **Критерий приёмки фазы 0 (все вместе):**
-- [ ] `docker compose up -d` — стек поднимается, healthchecks зелёные.
-- [ ] Сквозной прогон от ссылки до результата в чате работает (см. T-0.5).
-- [ ] `uv run pytest tests/ -q`, `ruff check`, `ruff format --check` — зелёные.
+- [x] `docker compose up -d` — стек поднимается, healthchecks зелёные.
+- [x] Сквозной прогон от ссылки до результата в чате работает (см. T-0.5).
+- [x] `uv run pytest tests/ -q`, `ruff check`, `ruff format --check` — зелёные.
 
 ---
 

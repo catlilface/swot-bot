@@ -12,6 +12,7 @@ from swot_contracts import (
     JobStatus,
     MessageBus,
     TranscriptReady,
+    resolve_under,
 )
 from swot_contracts.ports import JobRegistry
 
@@ -31,12 +32,14 @@ class AnalyzeService:
         summarizer: "Summarizer",
         bus: MessageBus,
         registry: JobRegistry,
+        artifacts_dir: str,
     ) -> None:
         self._prompt_name = prompt_name
         self._prompt_provider = prompt_provider
         self._summarizer = summarizer
         self._bus = bus
         self._registry = registry
+        self._artifacts_dir = Path(artifacts_dir)
 
     async def handle(self, message: TranscriptReady) -> None:
         await self._registry.set_status(message.task_id, JobStatus.ANALYZING)
@@ -45,9 +48,12 @@ class AnalyzeService:
                 task_id=message.task_id, trace_id=message.trace_id, stage="analyzing"
             )
         )
-        base_dir = Path(message.base_dir)
         try:
-            transcript = self._read_transcript(Path(message.srt_path))
+            # Path containment: upstream-supplied paths must stay inside the
+            # analyzer's own artifacts dir (P0-6).
+            base_dir = resolve_under(self._artifacts_dir, message.base_dir)
+            srt_path = resolve_under(base_dir, message.srt_path)
+            transcript = self._read_transcript(srt_path)
             prompt = self._prompt_provider.get(self._prompt_name)
             summary = await self._summarizer.summarize(transcript, prompt)
 

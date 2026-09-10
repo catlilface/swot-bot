@@ -14,6 +14,7 @@ from swot_contracts import (
     JobProgress,
     MessageBus,
     SourceRef,
+    resolve_under,
 )
 from swot_contracts.ports import JobRegistry
 
@@ -97,11 +98,33 @@ class ResultReporter:
         self._artifacts = Path(artifacts_dir)
 
     async def on_analysis(self, msg: AnalysisReady) -> None:
-        text = self._renderer.render(Path(msg.summary_path))
+        try:
+            # Path containment: summary_path comes from the analyzer message and
+            # must stay inside the bot's own artifacts dir (P0-6).
+            summary = resolve_under(self._artifacts, msg.summary_path)
+        except ValueError as exc:
+            logger.error(
+                "refusing summary outside artifacts: task_id=%s path=%s error=%s",
+                msg.task_id,
+                msg.summary_path,
+                exc,
+            )
+            return
+
+        text = self._renderer.render(summary)
         for part in _chunk_text(text):
             await self._bot.send_message(self._target, part, parse_mode="HTML")
 
         srt = self._artifacts / str(msg.task_id) / "transcript.srt"
+        try:
+            srt = resolve_under(self._artifacts, srt)
+        except ValueError as exc:
+            logger.error(
+                "refusing srt outside artifacts: task_id=%s error=%s",
+                msg.task_id,
+                exc,
+            )
+            return
         if srt.exists():
             await self._bot.send_document(
                 self._target,

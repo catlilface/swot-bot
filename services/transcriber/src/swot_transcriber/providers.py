@@ -47,6 +47,7 @@ class TranscribeServiceProvider(Provider):
             transcriber=transcriber,
             bus=bus,
             registry=registry,
+            media_dir=settings.media_dir,
         )
 
 

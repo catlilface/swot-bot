@@ -38,6 +38,7 @@ async def test_transcribe_publishes_transcript_ready(tmp_path: Path) -> None:
         transcriber=StubTranscriber(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
+        media_dir=str(tmp_path),
     )
     # media должен существовать до транскрипции
     (tmp_path / "m.m4a").write_bytes(b"fake-media")

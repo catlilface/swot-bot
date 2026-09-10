@@ -25,10 +25,25 @@ FAKE_TEXT = (
 )
 
 FAKE_SEGMENTS = [
-    {"id": 0, "start": 0.0, "end": 5.2, "text": "Привет, это фиксированная расшифровка для прогона dev-стека swot-bot."},
-    {"id": 1, "start": 5.2, "end": 12.4, "text": "Первый сегмент описывает вступление лекции."},
+    {
+        "id": 0,
+        "start": 0.0,
+        "end": 5.2,
+        "text": "Привет, это фиксированная расшифровка для прогона dev-стека swot-bot.",
+    },
+    {
+        "id": 1,
+        "start": 5.2,
+        "end": 12.4,
+        "text": "Первый сегмент описывает вступление лекции.",
+    },
     {"id": 2, "start": 12.4, "end": 19.8, "text": "Второй сегмент — основную тему."},
-    {"id": 3, "start": 19.8, "end": 27.0, "text": "Третий сегмент — выводы и практические рекомендации слушателям курса."},
+    {
+        "id": 3,
+        "start": 19.8,
+        "end": 27.0,
+        "text": "Третий сегмент — выводы и практические рекомендации слушателям курса.",
+    },
 ]
 
 FAKE_SUMMARY = {
@@ -43,7 +58,9 @@ FAKE_SUMMARY = {
         },
         {
             "heading": "Выводы",
-            "facts": [{"text": "Сегмент 3: практические рекомендации.", "start_sec": 19.8}],
+            "facts": [
+                {"text": "Сегмент 3: практические рекомендации.", "start_sec": 19.8}
+            ],
         },
     ],
 }
@@ -94,10 +111,21 @@ class FakeAsrHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length)
-        if self.path.rstrip("/").endswith("/v1/audio/transcriptions") or self.path.rstrip("/").endswith("/audio/transcriptions"):
+        if self.path.rstrip("/").endswith(
+            "/v1/audio/transcriptions"
+        ) or self.path.rstrip("/").endswith("/audio/transcriptions"):
             parts = _parse_multipart(body, self.headers.get("Content-Type", ""))
             if "file" not in parts:
-                _json(self, 400, {"error": {"message": "missing 'file' part", "type": "invalid_request"}})
+                _json(
+                    self,
+                    400,
+                    {
+                        "error": {
+                            "message": "missing 'file' part",
+                            "type": "invalid_request",
+                        }
+                    },
+                )
                 return
             print(
                 f"[fake-asr] transcription: {len(parts['file'])} bytes, "
@@ -144,7 +172,9 @@ def _llm_response(body: dict) -> dict:
         message: dict = {
             "role": "assistant",
             "content": None,
-            "tool_calls": [{"id": "call-fake", "type": "function", "function": function}],
+            "tool_calls": [
+                {"id": "call-fake", "type": "function", "function": function}
+            ],
         }
         finish_reason = "tool_calls"
     elif response_format.get("type") == "json_schema":
@@ -153,7 +183,10 @@ def _llm_response(body: dict) -> dict:
     else:
         message = {"role": "assistant", "content": content}
         finish_reason = "stop"
-    return {**base, "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}]}
+    return {
+        **base,
+        "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
+    }
 
 
 class FakeLlmHandler(BaseHTTPRequestHandler):
@@ -172,7 +205,10 @@ class FakeLlmHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(length) or b"{}")
         if self.path.rstrip("/").endswith("/v1/chat/completions"):
-            print(f"[fake-llm] chat completion request, model={body.get('model')!r}", flush=True)
+            print(
+                f"[fake-llm] chat completion request, model={body.get('model')!r}",
+                flush=True,
+            )
             _json(self, 200, _llm_response(body))
             return
         _json(self, 404, {"error": {"message": "not found", "type": "invalid_request"}})

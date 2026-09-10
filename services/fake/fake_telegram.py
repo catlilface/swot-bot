@@ -112,14 +112,20 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if "multipart" in content_type:
             parts = _parse_multipart(body, content_type)
-            return {k: v.decode(errors="replace") for k, v in parts.items() if k != "document"}
+            return {
+                k: v.decode(errors="replace")
+                for k, v in parts.items()
+                if k != "document"
+            }
         return {k: v[0] for k, v in parse_qs(body.decode(errors="replace")).items()}
 
     def _file_part(self) -> bytes:
         parts = _parse_multipart(self._body, self.headers.get("Content-Type", ""))
         return parts.get("document", b"")
 
-    def _message(self, chat_id: int, text: str | None = None, document: dict | None = None) -> dict:
+    def _message(
+        self, chat_id: int, text: str | None = None, document: dict | None = None
+    ) -> dict:
         message: dict = {
             "message_id": _next_msg_id(),
             "date": int(time.time()),
@@ -160,7 +166,10 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
                 with _state_lock:
                     update = _updates.popleft() if _updates else None
                 if update is not None:
-                    print(f"[fake-tg] serving update: {json.dumps(update, ensure_ascii=False)}", flush=True)
+                    print(
+                        f"[fake-tg] serving update: {json.dumps(update, ensure_ascii=False)}",
+                        flush=True,
+                    )
                     self._send_json(200, {"ok": True, "result": [update]})
                     return
                 if time.monotonic() >= deadline:
@@ -189,10 +198,15 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
                 f"file_size={document and document.get('file_size')}",
                 flush=True,
             )
-            self._send_json(200, {"ok": True, "result": self._message(chat_id, text, document)})
+            self._send_json(
+                200, {"ok": True, "result": self._message(chat_id, text, document)}
+            )
             return
 
-        self._send_json(404, {"ok": False, "error_code": 404, "description": f"unknown method {method}"})
+        self._send_json(
+            404,
+            {"ok": False, "error_code": 404, "description": f"unknown method {method}"},
+        )
 
     # -- HTTP verbs ------------------------------------------------------------
 
@@ -205,7 +219,9 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         if match is not None:
             self._api(match.group(1))
             return
-        self._send_json(404, {"ok": False, "error_code": 404, "description": "not found"})
+        self._send_json(
+            404, {"ok": False, "error_code": 404, "description": "not found"}
+        )
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
@@ -236,7 +252,9 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         if match is not None:
             self._api(match.group(1))
             return
-        self._send_json(404, {"ok": False, "error_code": 404, "description": "not found"})
+        self._send_json(
+            404, {"ok": False, "error_code": 404, "description": "not found"}
+        )
 
 
 def main() -> None:

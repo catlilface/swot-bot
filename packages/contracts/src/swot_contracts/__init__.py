@@ -24,10 +24,12 @@ from .events import (
     TranscriptReady,
     VideoDownloaded,
 )
+from .paths import resolve_under
 from .ports import Job, JobRegistry, JobStatus, MessageBus
 
 __all__ = [
     "AnalysisFailed",
+    "resolve_under",
     "AnalysisReady",
     "BaseMessage",
     "BrokerSettings",

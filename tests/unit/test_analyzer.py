@@ -42,6 +42,7 @@ async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
         summarizer=StubSummarizer(),  # type: ignore[arg-type]
         bus=bus,  # type: ignore[arg-type]
         registry=registry,  # type: ignore[arg-type]
+        artifacts_dir=str(tmp_path),
     )
     await svc.handle(
         TranscriptReady(

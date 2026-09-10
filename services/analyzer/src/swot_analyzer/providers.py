@@ -58,6 +58,7 @@ class AnalyzeServiceProvider(Provider):
             summarizer=summarizer,
             bus=bus,
             registry=registry,
+            artifacts_dir=settings.artifacts_dir,
         )
 
 
