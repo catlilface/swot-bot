@@ -33,7 +33,6 @@ ATTEMPTS_HEADER = "swot-attempts"
 
 EXCHANGE_NAME = "swot.events"
 RESULT_QUEUE = "result.deliver"
-JOB_EVENTS_QUEUE = "job.events"
 
 
 def dlx_name_for(exchange_name: str) -> str:
@@ -74,7 +73,6 @@ class RabbitMessageBus:
         self._channel_pool: Pool[Any] | None = None
         self._exchange: Any = None
         self._dlx: Any = None
-        self._job_events_exchange: Any = None
         self._pending_tasks: set[asyncio.Task] = set()
 
     async def connect(self) -> "RabbitMessageBus":
@@ -88,9 +86,6 @@ class RabbitMessageBus:
             )
             self._dlx = await channel.declare_exchange(
                 self._dlx_name, aio_pika.ExchangeType.TOPIC, durable=True
-            )
-            self._job_events_exchange = await channel.declare_exchange(
-                "job.events", aio_pika.ExchangeType.FANOUT, durable=True
             )
         return self
 

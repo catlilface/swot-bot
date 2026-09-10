@@ -362,11 +362,11 @@
   добавить в `_model_for`), `payload`/`created_at`, неиспользуемые константы,
   `openai`-зависимость анализатора, `main.py`.
 - Приёмка:
-  - [ ] `grep -rn "job.events\|job_events" packages services` — пусто (или
+  - [x] `grep -rn "job.events\|job_events" packages services` — пусто (или
         осознанное использование с тестом).
-  - [ ] `import swot_contracts.events; TranscribeRequest/AnalysisRequest` — удалены
+  - [x] `import swot_contracts.events; TranscribeRequest/AnalysisRequest` — удалены
         **или** поддерживаются `deserialize` (тест round-trip).
-  - [ ] `uv run pytest tests/ -q`, `ruff check` — зелёные (no unused).
+  - [x] `uv run pytest tests/ -q`, `ruff check` — зелёные (no unused).
 
 ### T-2.3 Тест-дубли вне production-модулей
 - Находки: P2-3. Зависимости: нет.

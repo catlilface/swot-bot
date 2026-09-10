@@ -25,7 +25,7 @@ from .events import (
     VideoDownloaded,
 )
 from .paths import resolve_under
-from .ports import Job, JobRegistry, JobStatus, MessageBus
+from .ports import JobRegistry, JobStatus, MessageBus
 
 __all__ = [
     "AnalysisFailed",
@@ -36,7 +36,6 @@ __all__ = [
     "DownloadFailed",
     "DownloadRequest",
     "DownloaderSettings",
-    "Job",
     "JobFailed",
     "JobProgress",
     "JobRegistry",

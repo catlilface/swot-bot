@@ -154,9 +154,6 @@ class DirectHttpAdapter:
     removed so no garbage lingers in the task dir.
     """
 
-    AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".ogg", ".aac", ".flac"}
-    VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".mov", ".avi"}
-
     #: Connect/read caps are separate from the overall total (P1-4): a slow
     #: big file must not be killed by the total, but a dead connection must.
     CONNECT_TIMEOUT_SEC = 15

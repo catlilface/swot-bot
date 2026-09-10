@@ -41,15 +41,6 @@ class JobStatus(StrEnum):
     FAILED = "failed"
 
 
-class Job(Protocol):
-    """A tracked pipeline run for one submitted link."""
-
-    task_id: UUID
-    status: JobStatus
-    source_url: str
-    message_id: int | None
-
-
 class JobRegistry(Protocol):
     """Track task lifecycle (idempotency + status). In-memory by default.
 
@@ -66,4 +57,4 @@ class JobRegistry(Protocol):
     async def purge_final(self, ttl_sec: float) -> int: ...
 
 
-__all__ = ["Job", "JobRegistry", "JobStatus", "MessageBus"]
+__all__ = ["JobRegistry", "JobStatus", "MessageBus"]

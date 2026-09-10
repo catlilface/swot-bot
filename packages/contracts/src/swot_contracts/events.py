@@ -9,8 +9,6 @@ Conventions (see docs/architecture.md):
 """
 
 import enum
-from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -20,18 +18,12 @@ class MessageType(enum.StrEnum):
     DOWNLOAD_REQUEST = "download.request"
     VIDEO_DOWNLOADED = "video.downloaded"
     DOWNLOAD_FAILED = "download.failed"
-    TRANSCRIBE_REQUEST = "transcribe.request"
     TRANSCRIPT_READY = "transcript.ready"
     TRANSCRIPT_FAILED = "transcript.failed"
-    ANALYSIS_REQUEST = "analysis.request"
     ANALYSIS_READY = "analysis.ready"
     ANALYSIS_FAILED = "analysis.failed"
     JOB_FAILED = "job.failed"
     JOB_PROGRESS = "job.progress"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 class SourceRef(BaseModel):
@@ -47,8 +39,6 @@ class BaseMessage(BaseModel):
     msg_type: MessageType
     task_id: UUID
     trace_id: str
-    created_at: datetime = Field(default_factory=_utcnow)
-    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class DownloadRequest(BaseMessage):
@@ -69,15 +59,6 @@ class VideoDownloaded(BaseMessage):
     resource_id: str | None = None
 
 
-class TranscribeRequest(BaseMessage):
-    """downloader -> transcriber (usually merged into VideoDownloaded)."""
-
-    msg_type: MessageType = MessageType.TRANSCRIBE_REQUEST
-    source: SourceRef
-    media_path: str
-    duration_sec: int = 0
-
-
 class TranscriptReady(BaseMessage):
     """transcriber -> analyzer: SRT + segments written to volume."""
 
@@ -88,15 +69,6 @@ class TranscriptReady(BaseMessage):
     segments_path: str
     language: str = ""
     duration_sec: int = 0
-
-
-class AnalysisRequest(BaseMessage):
-    """transcriber -> analyzer (usually merged into TranscriptReady)."""
-
-    msg_type: MessageType = MessageType.ANALYSIS_REQUEST
-    source: SourceRef
-    base_dir: str
-    transcript_path: str
 
 
 class AnalysisReady(BaseMessage):

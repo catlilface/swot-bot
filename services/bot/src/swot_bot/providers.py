@@ -67,7 +67,7 @@ class BotHandlersProvider(Provider):
 
 
 class BotConsumer:
-    """Long-running consumer: forwards analysis/job events to the reporter."""
+    """Long-running consumer: forwards analysis and job results to the reporter."""
 
     def __init__(self, bus: MessageBus, reporter: ResultReporter) -> None:
         self._bus = bus

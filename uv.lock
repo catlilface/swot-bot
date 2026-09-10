@@ -1763,7 +1763,6 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "langchain-text-splitters" },
     { name = "langfuse" },
-    { name = "openai" },
     { name = "swot-bus" },
     { name = "swot-contracts" },
     { name = "swot-observability" },
@@ -1776,7 +1775,6 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=0.3" },
     { name = "langchain-text-splitters", specifier = ">=0.3" },
     { name = "langfuse", specifier = ">=4,<5" },
-    { name = "openai", specifier = ">=1.55" },
     { name = "swot-bus", editable = "packages/bus" },
     { name = "swot-contracts", editable = "packages/contracts" },
     { name = "swot-observability", editable = "packages/observability" },
@@ -1916,9 +1914,6 @@ provides-extras = ["dev"]
 name = "swot-workspace"
 version = "0.0.0"
 source = { virtual = "." }
-dependencies = [
-    { name = "dishka" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -1930,7 +1925,6 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "dishka", specifier = ">=1.10.1" }]
 
 [package.metadata.requires-dev]
 dev = [
