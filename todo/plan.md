@@ -345,10 +345,10 @@
 - Работа: `READY` — только анализатор; (опционально) отдельные статусы после
   download/transcribe, либо `JobProgress` как источник истины.
 - Приёмка:
-  - [ ] Тесты downloader/transcriber утверждают промежуточные статусы (не READY),
+  - [x] Тесты downloader/transcriber утверждают промежуточные статусы (не READY),
     тест analyzer — READY.
-  - [ ] Reaper использует финальные статусы (`READY`/`FAILED`) — корректно.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+  - [x] Reaper использует финальные статусы (`READY`/`FAILED`) — корректно.
+  - [x] `uv run pytest tests/ -q` — зелёные.
 
 ### T-2.2 Мёртвый код
 - Находки: P2-2. Зависимости: нет.

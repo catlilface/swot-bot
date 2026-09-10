@@ -30,8 +30,13 @@ class MessageBus(Protocol):
 class JobStatus(StrEnum):
     PENDING = "pending"
     DOWNLOADING = "downloading"
+    #: Download finished; waiting for transcription (P2-1: not a final status).
+    DOWNLOADED = "downloaded"
     TRANSCRIBING = "transcribing"
+    #: Transcription finished; waiting for analysis (P2-1: not a final status).
+    TRANSCRIBED = "transcribed"
     ANALYZING = "analyzing"
+    #: Final: analysis finished, the result is ready to deliver (analyzer only).
     READY = "ready"
     FAILED = "failed"
 

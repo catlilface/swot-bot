@@ -57,7 +57,8 @@ async def test_transcribe_publishes_transcript_ready(tmp_path: Path) -> None:
     assert ready.msg_type.value == "transcript.ready"
     assert ready.srt_path.endswith("transcript.srt")
     assert ready.language == "ru"
-    assert await registry.get_status(task_id) == JobStatus.READY
+    # P2-1: READY — только analyzer; после расшифровки — промежуточный статус.
+    assert await registry.get_status(task_id) == JobStatus.TRANSCRIBED
 
 
 async def test_transcriber_publishes_job_progress(tmp_path: Path) -> None:

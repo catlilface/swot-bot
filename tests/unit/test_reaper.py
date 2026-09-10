@@ -51,6 +51,31 @@ async def test_reaper_fails_stuck_downloading_task() -> None:
     assert await registry.get_status(task_id) == JobStatus.FAILED
 
 
+async def test_reaper_maps_completed_stages_to_next_stage() -> None:
+    """P2-1: stuck в DOWNLOADED/TRANSCRIBED → таймаут «следующей» стадии."""
+    clock = FakeClock()
+    registry = InMemoryJobRegistry(clock=clock)
+    bus = FakeBus()
+    reaper = JobReaper(registry, bus, ttl_sec=TTL)
+
+    downloaded_task = _task(9)
+    await registry.create(downloaded_task, "https://example.com/a")
+    await registry.set_status(downloaded_task, JobStatus.DOWNLOADED)
+    transcribed_task = _task(10)
+    await registry.create(transcribed_task, "https://example.com/b")
+    await registry.set_status(transcribed_task, JobStatus.TRANSCRIBED)
+    clock.advance(TTL + 1)
+
+    reaped = await reaper.reap_once()
+
+    assert reaped == 2
+    failed = {m.task_id: m for m in bus.published if m.msg_type.value == "job.failed"}
+    assert failed[downloaded_task].stage == "transcribe"
+    assert failed[transcribed_task].stage == "analyze"
+    assert await registry.get_status(downloaded_task) == JobStatus.FAILED
+    assert await registry.get_status(transcribed_task) == JobStatus.FAILED
+
+
 async def test_reaper_ignores_fresh_tasks() -> None:
     clock = FakeClock()
     registry = InMemoryJobRegistry(clock=clock)

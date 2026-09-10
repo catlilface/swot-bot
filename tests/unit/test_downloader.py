@@ -79,7 +79,8 @@ async def test_downloader_publishes_video_downloaded(tmp_path: Path) -> None:
     ready = bus.get(1)
     assert ready.msg_type.value == "video.downloaded"
     assert ready.media_path.endswith("media.m4a")
-    assert await registry.get_status(task_id) == JobStatus.READY
+    # P2-1: READY — только analyzer; после скачивания — промежуточный статус.
+    assert await registry.get_status(task_id) == JobStatus.DOWNLOADED
 
 
 async def test_downloader_publishes_job_progress(tmp_path: Path) -> None:

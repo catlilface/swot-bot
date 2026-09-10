@@ -16,11 +16,14 @@ from swot_contracts.ports import JobRegistry
 logger = logging.getLogger(__name__)
 
 #: JobFailed.stage naming follows the existing stage conventions
-#: (download / transcribe / analyze).
+#: (download / transcribe / analyze). A task stuck at a completed stage's
+#: status is timed out in the *next* stage (P2-1).
 _STAGE_BY_STATUS: dict[JobStatus, str] = {
     JobStatus.PENDING: "download",
     JobStatus.DOWNLOADING: "download",
+    JobStatus.DOWNLOADED: "transcribe",
     JobStatus.TRANSCRIBING: "transcribe",
+    JobStatus.TRANSCRIBED: "analyze",
     JobStatus.ANALYZING: "analyze",
 }
 

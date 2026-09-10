@@ -70,7 +70,9 @@ class TranscribeService:
                     duration_sec=message.duration_sec,
                 )
             )
-            await self._registry.set_status(message.task_id, JobStatus.READY)
+            # P2-1: READY means "result ready to deliver" — only the analyzer
+            # sets it. Transcription done: the task now waits for analysis.
+            await self._registry.set_status(message.task_id, JobStatus.TRANSCRIBED)
             logger.info(
                 "transcript ready: task_id=%s trace_id=%s srt=%s",
                 message.task_id,

@@ -83,7 +83,9 @@ class DownloaderService:
                     resource_id=media.resource_id,
                 )
             )
-            await self._registry.set_status(message.task_id, JobStatus.READY)
+            # P2-1: READY means "result ready to deliver" — only the analyzer
+            # sets it. Download done: the task now waits for transcription.
+            await self._registry.set_status(message.task_id, JobStatus.DOWNLOADED)
             logger.info(
                 "video downloaded: task_id=%s trace_id=%s path=%s title=%s",
                 message.task_id,
