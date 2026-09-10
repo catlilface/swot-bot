@@ -31,6 +31,7 @@ class FfmpegAudioExtractor:
         )
         _, stderr = await proc.communicate()
         if proc.returncode != 0:
-            msg = stderr.decode(errors="replace")[:1000]
+            # ffmpeg prints a version banner first; the actual error is at the tail.
+            msg = stderr.decode(errors="replace").strip()[-500:]
             raise RuntimeError(f"ffmpeg failed: {msg}")
         return dst

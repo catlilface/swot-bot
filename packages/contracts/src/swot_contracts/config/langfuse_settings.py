@@ -12,7 +12,7 @@ class LangfuseSettings(BaseSettings):
     """Connection to the shared Langfuse instance.
 
     Used by the analyzer to fetch prompt templates (and tracing);
-    ``public_key`` and ``secret_key`` are required.
+    empty keys mean Langfuse is disabled (analyzer uses the local prompt).
 
     ``LANGFUSE__HOST``, ``LANGFUSE__PORT``, ``LANGFUSE__PUBLIC_KEY``,
     ``LANGFUSE__SECRET_KEY``.
@@ -26,8 +26,10 @@ class LangfuseSettings(BaseSettings):
 
     host: str = "langfuse"
     port: int = 3000
-    public_key: str
-    secret_key: str
+    # Empty keys mean "Langfuse is not in use": the analyzer falls back to
+    # the local prompt (see swot_analyzer.prompts.LocalPromptProvider).
+    public_key: str = ""
+    secret_key: str = ""
 
     @property
     def base_url(self):

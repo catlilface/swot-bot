@@ -68,8 +68,19 @@ class DownloaderService:
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
+            logger.info(
+                "video downloaded: task_id=%s trace_id=%s path=%s title=%s",
+                message.task_id,
+                message.trace_id,
+                media.media_path,
+                media.title,
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.exception("download failed: task_id=%s", message.task_id)
+            logger.exception(
+                "download failed: task_id=%s trace_id=%s",
+                message.task_id,
+                message.trace_id,
+            )
             from swot_contracts import JobFailed
 
             await self._bus.publish(

@@ -67,8 +67,18 @@ class AnalyzeService:
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
+            logger.info(
+                "summary ready: task_id=%s trace_id=%s path=%s",
+                message.task_id,
+                message.trace_id,
+                summary_path,
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.exception("analyze failed: task_id=%s", message.task_id)
+            logger.exception(
+                "analyze failed: task_id=%s trace_id=%s",
+                message.task_id,
+                message.trace_id,
+            )
             await self._registry.set_status(message.task_id, JobStatus.FAILED)
             await self._bus.publish(
                 JobFailed(

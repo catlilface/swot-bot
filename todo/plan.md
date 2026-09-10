@@ -93,22 +93,26 @@
 - Scope: `docker-compose.yml`, `.env.example`, `README.md`.
 - Работа: (1) RabbitMQ — `RABBITMQ_DEFAULT_USER/PASSWORD` (не guest) + соответствующие
   `BROKER__USER/PASSWORD`; (2) `bot` — volume `swot_artifacts:/data/artifacts`;
-  (3) `langfuse` — healthcheck + `depends_on: service_healthy` у analyzer
-  (либо убрать langfuse из compose с явной пометкой, что анализатор работает по
-  fallback — тогда T-0.4 обязателен); (4) ASR/LLM: либо добавить контейнеры-заглушки
-  (fake ASR/LLM для dev), либо в `.env.example` — реальные внешние URL **со схемой**
-  `http://`; (5) `restart: unless-stopped` всем; (6) README: quickstart
+  (3) `langfuse` — **убран из dev-стека** (явная пометка: анализатор работает по
+  fallback `LocalPromptProvider` из T-0.4; ключи `LANGFUSE__*` могут быть пустыми);
+  (4) ASR/LLM — контейнеры-заглушки `asr-service`/`llm-service` (fake OpenAI API);
+  (5) `restart: unless-stopped` всем; (6) README: quickstart
   (`cp .env.example .env`, `docker compose up`, что и где).
+  - Реализовано в T-0.5 дополнительно: fake Telegram-заглушка `fake-tg` (dev-токен +
+    `TELEGRAM__API_BASE_URL`, инъекция `/inject`); `ffmpeg` в образе transcriber;
+    `swot_media`-том примонтирован и downloader'у и transcriber'у; success-логи с
+    `task_id`/`trace_id` во всех 4 сервисах.
 - Приёмка:
-  - [ ] `docker compose config -q` — без ошибок.
-  - [ ] `docker compose up -d` → все контейнеры `running`, healthchecks `healthy`
-        (rabbit, postgres, langfuse, 4 сервиса) в пределах ~2 минут.
-  - [ ] `docker compose exec bot ls /data/artifacts` — том примонтирован (видны файлы,
+  - [x] `docker compose config -q` — без ошибок.
+  - [x] `docker compose up -d` → все контейнеры `running`, healthchecks `healthy`
+        (rabbit, 4 сервиса, fake-asr, fake-llm, fake-tg) в пределах ~2 минут.
+  - [x] `docker compose exec bot ls /data/artifacts` — том примонтирован (видны файлы,
         созданные пайплайном).
-  - [ ] Сквозной прогон (с fake ASR/LLM или внешними): админ кидает ссылку → в чат
-        приходит выжимка + SRT-файл; в логах всех 4 сервисов — один и тот же `trace_id`.
-  - [ ] `docker compose down && docker compose up -d` — стек восстанавливается
-        (restart-политики).
+  - [x] Сквозной прогон (с fake ASR/LLM/Telegram): админ кидает ссылку → в чат
+        приходит выжимка + SRT-файл; в логах всех 4 сервисов — один и тот же
+        `trace_id` (проверено: `t-4bdf4ab59c9e` в bot/downloader/transcriber/analyzer).
+  - [x] `docker compose down && docker compose up -d` — стек восстанавливается
+        (restart-политики, 8/8 healthy за ~30 c).
 
 ### T-0.6 Path containment для путей из сообщений
 - Находки: P0-6. Зависимости: нет.

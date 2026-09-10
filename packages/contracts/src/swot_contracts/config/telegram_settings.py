@@ -24,3 +24,6 @@ class TelegramSettings(BaseSettings):
     token: str | None = None  # BotFather token
     admin_id: int | None = None  # admin who submits links and receives results
     target_chat_id: int | None = None  # chat where ready summaries are published
+    # Empty means the real https://api.telegram.org; set e.g.
+    # http://fake-tg:8081 to point the bot at the dev Telegram stub.
+    api_base_url: str = ""

@@ -23,7 +23,19 @@ class BotHandlersProvider(Provider):
 
     @provide(scope=Scope.APP)
     def bot(self, settings: Settings) -> aiogram.Bot:
-        return aiogram.Bot(token=settings.telegram.token or "")
+        token = settings.telegram.token or ""
+        base_url = (settings.telegram.api_base_url or "").strip().rstrip("/")
+        if not base_url:
+            return aiogram.Bot(token=token)
+        # Dev stub / local proxy: point the client at a custom Bot API server.
+        from aiogram.client.session.aiohttp import AiohttpSession
+        from aiogram.client.telegram import TelegramAPIServer
+
+        api = TelegramAPIServer(
+            base=f"{base_url}/bot{{token}}/{{method}}",
+            file=f"{base_url}/file/bot{{token}}/{{path}}",
+        )
+        return aiogram.Bot(token=token, session=AiohttpSession(api=api))
 
     @provide(scope=Scope.APP)
     def router(self, settings: Settings) -> Router:

@@ -64,11 +64,15 @@ def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
             return
 
         task_id = uuid4()
+        trace_id = f"t-{task_id.hex[:12]}"
+        logger.info(
+            "link received: task_id=%s trace_id=%s url=%s", task_id, trace_id, user_text
+        )
         await registry.create(task_id, url)
         await bus.publish(
             DownloadRequest(
                 task_id=task_id,
-                trace_id=f"t-{task_id.hex[:12]}",
+                trace_id=trace_id,
                 source=SourceRef(url=url, kind=_kind_for(url)),
             )
         )

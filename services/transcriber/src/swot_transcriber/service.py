@@ -68,9 +68,19 @@ class TranscribeService:
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
+            logger.info(
+                "transcript ready: task_id=%s trace_id=%s srt=%s",
+                message.task_id,
+                message.trace_id,
+                result.srt_path,
+            )
             self._cleanup_media(message.media_path)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("transcribe failed: task_id=%s", message.task_id)
+            logger.exception(
+                "transcribe failed: task_id=%s trace_id=%s",
+                message.task_id,
+                message.trace_id,
+            )
             from swot_contracts import JobFailed
 
             await self._bus.publish(

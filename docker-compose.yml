@@ -1,124 +1,186 @@
-# docker-compose для swot-bot (все микросервисы + rabbit + langfuse self-hosted)
+# swot-bot dev stack: RabbitMQ + 4 services + dev stubs for external deps.
+#
+# Quickstart:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# By default the stack is fully self-contained (no API keys needed):
+#   - asr-service / llm-service — OpenAI-compatible fakes (services/fake/);
+#   - fake-tg — Telegram Bot API stub; send a "link from admin":
+#       curl -X POST http://localhost:8081/inject \
+#            -H 'Content-Type: application/json' \
+#            -d '{"text": "https://example.com/lecture.mp4"}'
+#     the bot then runs the whole pipeline and "posts" the result
+#     (see `docker compose logs fake-tg`).
+#
+# Real integrations: edit .env — TELEGRAM__TOKEN / TELEGRAM__API_BASE_URL
+# (empty base URL = api.telegram.org), LLM__API_URL, TRANSCRIBER__API_URL —
+# and comment out the fake services. Langfuse is not part of the dev compose
+# by design (v3 needs Postgres+ClickHouse+Redis+MinIO): the analyzer works
+# via the local prompt fallback (T-0.4); see README "Optional services".
+
 services:
   rabbitmq:
     image: rabbitmq:4-management
+    restart: unless-stopped
+    environment:
+      # guest is loopback-only — services connect from other containers,
+      # so a dedicated user is required (audit P0-5).
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-swot}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:-swot}
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "15672:15672" # management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      retries: 6
+      start_period: 20s
     networks: [swot]
 
-  postgres:
-    image: postgres:16-alpine
+  asr-service:
+    image: swot-bot/fake:dev
+    build:
+      context: .
+      dockerfile: .docker/fake/Dockerfile
+    restart: unless-stopped
+    command: ["python", "fake_openai.py", "asr"]
     environment:
-      POSTGRES_DB: langfuse
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langfuse-secret}
-    volumes:
-      - langfuse_pg_data:/var/lib/postgresql/data
+      FAKE_PORT: "8000"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
     networks: [swot]
 
-  langfuse:
-    image: langfuse/langfuse:latest
-    depends_on:
-      postgres:
-        condition: service_healthy
+  llm-service:
+    image: swot-bot/fake:dev
+    restart: unless-stopped
+    command: ["python", "fake_openai.py", "llm"]
     environment:
-      DATABASE_URL: postgres://langfuse:${POSTGRES_PASSWORD:-langfuse-secret}@postgres:5432/langfuse
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
-      SALT: ${SALT:-change-me-salt}
+      FAKE_PORT: "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks: [swot]
+
+  fake-tg:
+    image: swot-bot/fake:dev
+    restart: unless-stopped
+    command: ["python", "fake_telegram.py"]
+    environment:
+      FAKE_PORT: "8081"
+      FAKE_ADMIN_ID: "12345678" # must match TELEGRAM__ADMIN_ID in .env
     ports:
-      - "3000:3000"
+      - "8081:8081" # /inject endpoint for sending "admin messages"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     networks: [swot]
 
   bot:
+    image: swot-bot/bot:dev
     build:
       context: .
       dockerfile: .docker/bot/Dockerfile
+    restart: unless-stopped
     env_file: .env
     depends_on:
       rabbitmq:
         condition: service_healthy
+      fake-tg:
+        condition: service_started
+    volumes:
+      - swot_artifacts:/data/artifacts
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     networks: [swot]
 
   downloader:
+    image: swot-bot/downloader:dev
     build:
       context: .
       dockerfile: .docker/downloader/Dockerfile
+    restart: unless-stopped
     env_file: .env
-    volumes:
-      - swot_media:/data/media
-      - swot_artifacts:/data/artifacts
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - swot_media:/data/media
+      - swot_artifacts:/data/artifacts
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     networks: [swot]
 
   transcriber:
+    image: swot-bot/transcriber:dev
     build:
       context: .
       dockerfile: .docker/transcriber/Dockerfile
+    restart: unless-stopped
     env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      asr-service:
+        condition: service_started
     volumes:
       - swot_media:/data/media
       - swot_artifacts:/data/artifacts
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     networks: [swot]
 
   analyzer:
+    image: swot-bot/analyzer:dev
     build:
       context: .
       dockerfile: .docker/analyzer/Dockerfile
+    restart: unless-stopped
     env_file: .env
-    volumes:
-      - swot_artifacts:/data/artifacts
     depends_on:
       rabbitmq:
         condition: service_healthy
-      langfuse:
+      llm-service:
         condition: service_started
+    volumes:
+      - swot_artifacts:/data/artifacts
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     networks: [swot]
 
 volumes:
   rabbitmq_data:
-  langfuse_pg_data:
   swot_media:
   swot_artifacts:
 
 networks:
   swot:
-    driver: bridge

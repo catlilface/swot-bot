@@ -11,6 +11,9 @@ COPY services/transcriber/ services/transcriber/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --package swot-transcriber --no-dev
 
+# ffmpeg: FfmpegAudioExtractor shells out to it (audio extraction for the ASR call).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
 # `python` resolves to /app/.venv/bin/python.
 ENV PATH="/app/.venv/bin:$PATH"
 
