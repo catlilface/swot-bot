@@ -16,6 +16,7 @@ class DownloaderSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="DOWNLOADER__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

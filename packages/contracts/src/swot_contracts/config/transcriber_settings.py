@@ -16,6 +16,7 @@ class TranscriberSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="TRANSCRIBER__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

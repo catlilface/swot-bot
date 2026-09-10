@@ -18,6 +18,7 @@ class LLMSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="LLM__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

@@ -32,9 +32,10 @@ from swot_transcriber.service import TranscribeService
 
 @pytest.fixture
 def settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Наполнить env всеми секциями Settings (текущая схема: секции required).
+    """Наполнить env значениями секций Settings (секции опциональны, T-1.1).
 
-    T-1.1 сделает секции опциональными — тогда fixture станет проще.
+    Переменные задают конкретные значения (а не «required») — например,
+    TELEGRAM__TOKEN нужен для реального BotHandlers.
     """
     env = {
         "BROKER__HOST": "rabbit-test",

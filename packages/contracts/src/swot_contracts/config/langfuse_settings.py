@@ -19,6 +19,7 @@ class LangfuseSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="LANGFUSE__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

@@ -150,13 +150,19 @@
   опциональны (default-экземпляры); `LangfuseSettings.public_key/secret_key = ""`;
   поправить docstring'ы; `.env.example` привести к новым префиксам.
 - Приёмка:
-  - [ ] `Settings()` в **пустом** env — конструируется без ошибок (все секции по
+  - [x] `Settings()` в **пустом** env — конструируется без ошибок (все секции по
         умолчанию).
-  - [ ] Тест-регрессия: `USER=macuser PORT=9999 LANGUAGE=en_US:en MODEL=x` в env →
+        (секции — `Field(default_factory=...)`; тест `tests/unit/test_settings.py::test_settings_empty_env_uses_defaults`)
+  - [x] Тест-регрессия: `USER=macuser PORT=9999 LANGUAGE=en_US:en MODEL=x` в env →
         `broker.user == "guest"`, `broker.port == 5672`, `transcriber.language == ""`,
         `transcriber.model == "whisper-1"`.
-  - [ ] Анализатор/бот стартуют без `LANGFUSE__PUBLIC_KEY/SECRET_KEY`.
-  - [ ] `uv run pytest tests/ -q` — зелёные (старые тесты на Settings обновлены).
+        (`test_noisy_env_does_not_leak_into_sections`; у каждой под-секции `env_prefix`
+        — `BROKER__`, `LLM__`, `TRANSCRIBER__` и т.д.)
+  - [x] Анализатор/бот стартуют без `LANGFUSE__PUBLIC_KEY/SECRET_KEY`.
+        (ключи дефолт `""`; compose-прогон: 8/8 healthy, E2E trace t-68c52c26c0ce)
+  - [x] `uv run pytest tests/ -q` — зелёные (старые тесты на Settings обновлены).
+        (69 unit-тестов, `ruff check`/`format` — чисто; docstring'ы обновлены,
+        `.env.example` уже на префиксах)
 
 ### T-1.2 DLQ, reaper задач, TTL-очистка
 - Находки: P1-5, P1-11. Зависимости: T-0.5 (очереди в compose).

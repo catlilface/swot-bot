@@ -11,10 +11,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class BrokerSettings(BaseSettings):
     """Connection to the shared RabbitMQ broker for pipeline events.
 
-    ``BROKER__HOST``, ``BROKER__PORT``, ``BROKER__USER``, ``BROKER__PASSWORD``.
+    Env vars are prefixed (``env_prefix``): ``BROKER__HOST``,
+    ``BROKER__PORT``, ``BROKER__USER``, ``BROKER__PASSWORD``. When nested
+    inside :class:`~swot_contracts.config.Settings` the same names are
+    produced via the parent's ``env_nested_delimiter="__"``.
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="BROKER__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
