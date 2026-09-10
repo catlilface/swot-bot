@@ -7,8 +7,8 @@ from swot_contracts import MessageBus, Settings
 from swot_contracts.ports import JobRegistry
 
 from .asr import FakeTranscriber, OpenaiAsrTranscriber
-from .domain import AudioExtractor, Transcriber
-from .ffmpeg import FfmpegAudioExtractor
+from .domain import AudioExtractor, Segmenter, Transcriber
+from .ffmpeg import FfmpegAudioExtractor, FfmpegSegmenter
 from .service import TranscribeService
 
 
@@ -20,12 +20,20 @@ class TranscriberAdaptersProvider(Provider):
         return FfmpegAudioExtractor()
 
     @provide(scope=Scope.APP)
-    def transcriber(self, settings: Settings) -> Transcriber:
+    def segmenter(self) -> Segmenter:
+        return FfmpegSegmenter()
+
+    @provide(scope=Scope.APP)
+    def transcriber(self, settings: Settings, segmenter: Segmenter) -> Transcriber:
         return OpenaiAsrTranscriber(
             base_url=settings.transcriber.api_url,
             api_key=settings.transcriber.api_key,
             model=settings.transcriber.model,
             language=settings.transcriber.language,
+            segmenter=segmenter,
+            segment_duration_sec=settings.transcriber.segment_duration_sec,
+            max_audio_mb=settings.transcriber.max_audio_mb,
+            timeout_sec=settings.transcriber.asr_timeout_sec,
         )
 
 

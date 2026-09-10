@@ -37,6 +37,10 @@ class AnalyzerAdaptersProvider(Provider):
             api_key=settings.llm.api_key,
             model=settings.llm.model_id,
             temperature=settings.llm.sampling_parameters.get("temperature", 0.3),
+            max_tokens=settings.llm.max_tokens,
+            timeout_sec=settings.llm.timeout_sec,
+            chunk_chars=settings.llm.chunk_chars,
+            max_transcript_chars=settings.llm.max_transcript_chars,
         )
 
 

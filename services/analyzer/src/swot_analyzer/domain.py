@@ -27,6 +27,10 @@ class Summary(BaseModel):
     sections: list[Section] = Field(default_factory=list)
 
 
+class SummarizeError(Exception):
+    """Summarization failure (transcript over size limit, LLM call failed)."""
+
+
 class PromptProvider(Protocol):
     """Fetch the analysis prompt (Langfuse or local fallback)."""
 

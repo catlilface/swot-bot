@@ -14,7 +14,8 @@ class LLMSettings(BaseSettings):
     ``LLM__API_URL``, ``LLM__API_KEY``, ``LLM__MODEL_ID``,
     ``LLM__SAMPLING_PARAMETERS`` (a JSON object, e.g.
     ``LLM__SAMPLING_PARAMETERS='{"temperature": 0.2}'``),
-    ``LLM__SUMMARIZATION_PROMPT_NAME``.
+    ``LLM__SUMMARIZATION_PROMPT_NAME``, ``LLM__MAX_TOKENS``, ``LLM__TIMEOUT_SEC``,
+    ``LLM__CHUNK_CHARS``, ``LLM__MAX_TRANSCRIPT_CHARS``.
     """
 
     model_config = SettingsConfigDict(
@@ -29,3 +30,7 @@ class LLMSettings(BaseSettings):
     model_id: str = "gpt-4o-mini"
     sampling_parameters: dict = {}  # e.g. {"temperature": 0.2}
     summarization_prompt_name: str = "lecture-summary"  # Langfuse prompt name
+    max_tokens: int = 4096  # потолок длины ответа LLM за один вызов
+    timeout_sec: int = 120  # таймаут одного вызова LLM-эндпоинта
+    chunk_chars: int = 8000  # размер фрагмента транскрипта в map-reduce чанкинге
+    max_transcript_chars: int = 200000  # жёсткий лимит размера транскрипта

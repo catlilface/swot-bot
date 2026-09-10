@@ -225,13 +225,26 @@
   (`langchain-text-splitters` уже в зависимостях) + `max_tokens`/`timeout`, лимит на
   размер транскрипта с понятной ошибкой.
 - Приёмка:
-  - [ ] Тест: «аудио» 3 часа (можно эмуляцией списка сегментов) → N ASR-вызовов,
+  - [x] Тест: «аудио» 3 часа (можно эмуляцией списка сегментов) → N ASR-вызовов,
     SRT-таймкоды сдвинуты корректно (первый сегмент = 00:00:00, второй =
     00:10:00:00, …).
-  - [ ] Тест: аудио > лимита → `JobFailed` с явной причиной до загрузки в память.
-  - [ ] Тест: транскрипт > контекста → map-reduce: LLM вызывается несколько раз,
+        (`test_chunking.py::test_long_audio_splitted_per_segment_with_shifted_srt` —
+        18 сегментов по 10 мин → 18 ASR-вызовов, SRT: `00:00:00,000` / `00:10:00,000`
+        / `00:20:00,000` / `03:00:00,000`; сегменты.json — сдвинутые таймкоды)
+  - [x] Тест: аудио > лимита → `JobFailed` с явной причиной до загрузки в память.
+        (`test_chunking.py::test_oversized_audio_publishes_job_failed` —
+        `TranscribeService` публикует `job.failed` с причиной "audio too large…
+        limit…", сегментация и ASR-клиент не вызывались; проверка размера идёт
+        до `open()`/загрузки)
+  - [x] Тест: транскрипт > контекста → map-reduce: LLM вызывается несколько раз,
     итоговая `Summary` валидна (Pydantic), факты не дублируются.
-  - [ ] `uv run pytest tests/ -q` — зелёные.
+        (`test_chunking.py::test_map_reduce_multiple_chunks_no_duplicate_facts` —
+        2 map + 1 reduce, дубль `ФАКТ: A` устранён; `::test_long_transcript_splits_into_multiple_map_calls`
+        — реальный `RecursiveCharacterTextSplitter`: N чанков + reduce, 3000 фактов
+        без потерь; лимит `max_transcript_chars` — `::test_transcript_over_limit_rejected_without_llm_call`;
+        `max_tokens`/`request_timeout` на `ChatOpenAI` — `::test_chatopenai_gets_max_tokens_and_timeout`)
+  - [x] `uv run pytest tests/ -q` — зелёные.
+        (90 тестов; `ruff check`/`format --check` — чисто)
 
 ### T-1.5 Сквозной trace_id + единый JSON-лог
 - Находки: P1-8, P1-9. Зависимости: нет.

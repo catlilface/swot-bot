@@ -12,7 +12,8 @@ class TranscriberSettings(BaseSettings):
     """OpenAI-compatible ASR endpoint used by the transcriber (TRANSCRIBER__*).
 
     ``TRANSCRIBER__API_URL``, ``TRANSCRIBER__API_KEY``, ``TRANSCRIBER__MODEL``,
-    ``TRANSCRIBER__LANGUAGE``.
+    ``TRANSCRIBER__LANGUAGE``, ``TRANSCRIBER__SEGMENT_DURATION_SEC``,
+    ``TRANSCRIBER__MAX_AUDIO_MB``, ``TRANSCRIBER__ASR_TIMEOUT_SEC``.
     """
 
     model_config = SettingsConfigDict(
@@ -26,3 +27,10 @@ class TranscriberSettings(BaseSettings):
     api_key: str | None = None  # Bearer key; "none" is sent when unset
     model: str = "whisper-1"  # ASR model id exposed by the endpoint
     language: str = ""  # ISO code, e.g. "ru"; empty = auto-detect
+    segment_duration_sec: int = (
+        600  # длинное аудио режется на чанки до N сек (10–15 мин)
+    )
+    max_audio_mb: int = (
+        512  # жёсткий лимит размера аудио (проверка ДО загрузки в память)
+    )
+    asr_timeout_sec: int = 300  # таймаут одного вызова ASR-эндпоинта

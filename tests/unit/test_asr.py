@@ -6,6 +6,19 @@ from pathlib import Path
 from swot_transcriber.asr import OpenaiAsrTranscriber
 
 
+class _FakeSegmenter:
+    """Segmenter that returns the audio file itself as a single chunk."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Path, Path, int]] = []
+
+    async def segment(
+        self, audio_path: Path, out_dir: Path, segment_duration_sec: int
+    ) -> list[Path]:
+        self.calls.append((audio_path, out_dir, segment_duration_sec))
+        return [audio_path]
+
+
 class _Segment:
     def __init__(self, start: float, end: float, text: str) -> None:
         self.start = start
@@ -51,12 +64,14 @@ def _make(
     result: _Result, tmp_path: Path
 ) -> tuple[OpenaiAsrTranscriber, _Client, Path]:
     client = _Client(result)
+    segmenter = _FakeSegmenter()
     transcriber = OpenaiAsrTranscriber(
         base_url="http://asr:8000/v1",
         api_key="k",
         model="whisper-1",
         language="",
         client=client,
+        segmenter=segmenter,
     )
     audio = tmp_path / "audio.wav"
     audio.write_bytes(b"pcm")
@@ -117,6 +132,7 @@ async def test_transcribe_passes_configured_language(tmp_path: Path) -> None:
         model="whisper-1",
         language="en",
         client=client,
+        segmenter=_FakeSegmenter(),
     )
     audio = tmp_path / "a.wav"
     audio.write_bytes(b"pcm")
