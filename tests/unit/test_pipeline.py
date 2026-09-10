@@ -37,7 +37,8 @@ class StubRouter:
         f = dst_dir / "lecture.m4a"
         f.write_bytes(b"fake-video")
         return DownloadedMedia(
-            media_path=f, title="Лекция", duration_sec=120, resource_id="r1"
+            media_path=f, title="Квантовая механика: основы", duration_sec=120,
+            resource_id="r1",
         )
 
 
@@ -133,9 +134,12 @@ async def test_full_pipeline_end_to_end(tmp_path: Path) -> None:
 
     ready = next((m for m in bus.published if isinstance(m, AnalysisReady)), None)
     assert ready is not None, [t.value for t in bus.published_types()]
+    # T-2.4: ивент несёт путь к SRT — файл реально лежит на томе
+    assert Path(ready.srt_path).exists()
     summary_path = Path(ready.summary_path)
     assert summary_path.exists()
     text = MessageRenderer().render(summary_path)
-    assert "Выжимка лекции" in text  # фолбэк шаблона: title в summary.json больше нет
+    # T-2.4: заголовок из download (title в stub-роутере) попал в сообщение
+    assert "Квантовая механика: основы" in text
     assert "Факт №1" in text
     assert "00:00" in text  # факт на 0 секунд -> MM:SS

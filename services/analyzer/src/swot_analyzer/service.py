@@ -59,6 +59,9 @@ class AnalyzeService:
             transcript = self._read_transcript(srt_path)
             prompt = self._prompt_provider.get(self._prompt_name)
             summary = await self._summarizer.summarize(transcript, prompt)
+            # T-2.4: заголовок — метаданные видео (не результат LLM),
+            # переносим из transcript.ready в summary.json и analysis.ready.
+            summary.title = message.title
 
             summary_path = base_dir / "summary.json"
             summary_path.write_text(
@@ -73,6 +76,9 @@ class AnalyzeService:
                     source=message.source,
                     base_dir=str(base_dir),
                     summary_path=str(summary_path),
+                    title=summary.title,
+                    # T-2.4: бот использует путь из ивента, а не из своего конфига.
+                    srt_path=str(srt_path),
                 )
             )
             await self._registry.set_status(message.task_id, JobStatus.READY)
@@ -117,13 +123,9 @@ class AnalyzeService:
 
 
 def _summary_to_dict(summary: Summary) -> dict[str, Any]:
-    return {
-        "summary": summary.summary,
-        "sections": [
-            {
-                "heading": s.heading,
-                "facts": [{"text": f.text, "start_sec": f.start_sec} for f in s.facts],
-            }
-            for s in summary.sections
-        ],
-    }
+    """T-2.4: сериализация только через pydantic — model_dump(mode="json").
+
+    Ручное поле-в-поле копирование упразднено: новый факт/поле в модели
+    гарантированно попадает в summary.json (и в test эквивалентности).
+    """
+    return summary.model_dump(mode="json")

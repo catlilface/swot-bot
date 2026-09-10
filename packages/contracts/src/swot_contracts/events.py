@@ -69,6 +69,9 @@ class TranscriptReady(BaseMessage):
     segments_path: str
     language: str = ""
     duration_sec: int = 0
+    # T-2.4: заголовок видео, переданный от video.downloaded, чтобы он
+    # дошёл до summary.json и сообщения бота.
+    title: str = ""
 
 
 class AnalysisReady(BaseMessage):
@@ -79,6 +82,9 @@ class AnalysisReady(BaseMessage):
     base_dir: str
     summary_path: str
     title: str = ""
+    # T-2.4: путь к SRT несёт сам ивент — бот не пересобирает его из своего
+    # конфига (изменения TRANSCRIBER__ARTIFACTS_DIR не ломают доставку).
+    srt_path: str = ""
 
 
 class JobFailed(BaseMessage):

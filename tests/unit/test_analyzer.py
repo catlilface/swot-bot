@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fakes import FakeBus
 from swot_analyzer.domain import Fact, Section, Summary
-from swot_analyzer.service import AnalyzeService
+from swot_analyzer.service import AnalyzeService, _summary_to_dict
 from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobProgress, JobStatus, SourceRef, TranscriptReady
 
@@ -53,6 +53,8 @@ async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
             base_dir=str(base_dir),
             srt_path=str(base_dir / "transcript.srt"),
             segments_path=str(base_dir / "segments.json"),
+            # T-2.4: заголовок видео — из video.downloaded через transcript.ready
+            title="Квантовая механика: основы",
         )
     )
     assert "analysis.ready" in [t.value for t in bus.published_types()]
@@ -60,7 +62,31 @@ async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
     assert ready.msg_type.value == "analysis.ready"
     summary = load((base_dir / "summary.json").open(encoding="utf-8"))
     assert summary["sections"][0]["facts"][0]["start_sec"] == 5
+    # T-2.4: title из transcript.ready попал в summary.json, ивент несёт title
+    # и srt_path (бот берёт SRT из ивента, а не из своего конфига).
+    assert summary["title"] == "Квантовая механика: основы"
+    assert ready.title == "Квантовая механика: основы"
+    assert ready.srt_path == str(base_dir / "transcript.srt")
+    # T-2.4: сериализация эквивалентна model_dump(mode="json")
+    assert summary == _expected_summary().model_dump(mode="json")
     assert await registry.get_status(task_id) == JobStatus.READY
+
+
+def _expected_summary() -> Summary:
+    return Summary(
+        title="Квантовая механика: основы",
+        summary="Резюме",
+        sections=[
+            Section(heading="Гл1", facts=[Fact(text="Факт из транскрипта", start_sec=5)])
+        ],
+    )
+
+
+def test_summary_to_dict_equals_model_dump() -> None:
+    """T-2.4: _summary_to_dict == summary.model_dump(mode='json')."""
+    summary = _expected_summary()
+    assert _summary_to_dict(summary) == summary.model_dump(mode="json")
+    assert _summary_to_dict(Summary()) == Summary().model_dump(mode="json")
 
 
 async def test_analyzer_publishes_job_progress(tmp_path: Path) -> None:

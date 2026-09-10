@@ -212,6 +212,7 @@ async def test_bot_rejects_summary_path_outside_artifacts(tmp_path: Path) -> Non
             source=SourceRef(url="https://example.com/v.mp4"),
             base_dir="/etc",
             summary_path="/etc/passwd",
+            srt_path="",
         )
     )
 
@@ -255,6 +256,7 @@ async def test_bot_happy_path_sends_text_and_srt(tmp_path: Path) -> None:
             source=SourceRef(url="https://example.com/v.mp4"),
             base_dir=str(artifacts / str(task_id)),
             summary_path=str(artifacts / str(task_id) / "summary.json"),
+            srt_path=str(artifacts / str(task_id) / "transcript.srt"),
         )
     )
 

@@ -68,6 +68,7 @@ class TranscribeService:
                     segments_path=str(result.segments_path),
                     language=result.language,
                     duration_sec=message.duration_sec,
+                    title=message.title,
                 )
             )
             # P2-1: READY means "result ready to deliver" — only the analyzer

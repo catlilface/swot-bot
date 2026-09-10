@@ -199,20 +199,33 @@ class ResultReporter:
             what="delivery-failed notice",
         )
 
-    async def _deliver_result(self, msg: AnalysisReady) -> None:
-        """Render and send the result; any failure raises (see on_analysis)."""
+    def _resolve_artifact(self, path: str) -> Path | None:
+        """Resolve a producer-provided path under the bot's artifacts dir.
+
+        Containment (P0-6): the path must stay inside *artifacts_dir*.
+        Returns ``None`` for empty, escaping, or non-file paths.
+        T-2.4: paths come from the bus event, not from our own config.
+        """
+        if not path:
+            return None
         try:
-            # Path containment: summary_path comes from the analyzer message and
-            # must stay inside the bot's own artifacts dir (P0-6).
-            summary = resolve_under(self._artifacts, msg.summary_path)
+            resolved = resolve_under(self._artifacts, path)
         except ValueError as exc:
             logger.error(
-                "refusing summary outside artifacts: task_id=%s path=%s error=%s",
-                msg.task_id,
-                msg.summary_path,
+                "refusing artifact path outside artifacts: path=%s error=%s",
+                path,
                 exc,
             )
-            raise
+            return None
+        if not resolved.is_file():
+            return None
+        return resolved
+
+    async def _deliver_result(self, msg: AnalysisReady) -> None:
+        """Render and send the result; any failure raises (see on_analysis)."""
+        summary = self._resolve_artifact(msg.summary_path)
+        if summary is None:
+            raise ValueError(f"summary path unavailable: {msg.summary_path!r}")
 
         text = self._renderer.render(summary)
         for part in _chunk_text(text):
@@ -222,18 +235,10 @@ class ResultReporter:
 
             await self._send(send_part, what="result message")
 
-        srt = self._artifacts / str(msg.task_id) / "transcript.srt"
-        try:
-            srt = resolve_under(self._artifacts, srt)
-        except ValueError as exc:
-            # Non-fatal: the text is already delivered; skip the file.
-            logger.error(
-                "refusing srt outside artifacts: task_id=%s error=%s",
-                msg.task_id,
-                exc,
-            )
-            return
-        if srt.exists():
+        # T-2.4: SRT-путь несёт ивент analysis.ready (из конфига транскрибера);
+        # бот не пересобирает его из своего artifacts_dir/task_id.
+        srt = self._resolve_artifact(msg.srt_path)
+        if srt is not None:
             await self._send(
                 lambda: self._bot.send_document(
                     self._target,

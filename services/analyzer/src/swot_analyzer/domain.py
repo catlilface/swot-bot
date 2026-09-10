@@ -1,6 +1,5 @@
 """Analyzer service domain: prompt + summarizer ports, summary model."""
 
-from dataclasses import field
 from typing import Protocol
 
 from pydantic import BaseModel, Field
@@ -17,12 +16,17 @@ class Section(BaseModel):
     """A section of the summary holding several facts."""
 
     heading: str = ""
-    facts: list[Fact] = field(default_factory=list)
+    # T-2.4: pydantic Field вместо dataclasses.field — единый механизм
+    # дефолтов в BaseModel.
+    facts: list[Fact] = Field(default_factory=list)
 
 
 class Summary(BaseModel):
     """Structured lecture summary (targets summary.json)."""
 
+    # T-2.4: заголовок видео (из video.downloaded) — попадает в summary.json
+    # и рендерится в сообщении бота; пустой — шаблон подставит фолбэк.
+    title: str = ""
     summary: str = ""
     sections: list[Section] = Field(default_factory=list)
 

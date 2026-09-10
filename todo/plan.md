@@ -392,13 +392,13 @@
   `swot_contracts/events.py` (`Section` — `Field`), `swot_bot/renderer.py` (кэш
   шаблона).
 - Приёмка:
-  - [ ] `Summary` получает `title` из `VideoDownloaded.title`; бот рендерит его
+  - [x] `Summary` получает `title` из `VideoDownloaded.title`; бот рендерит его
     (тест: заголовок из download появляется в сообщении).
-  - [ ] `_summary_to_dict` == `summary.model_dump(mode="json")` (тест на равенство).
-  - [ ] `AnalysisReady` несёт путь SRT; `on_analysis` использует его, не
+  - [x] `_summary_to_dict` == `summary.model_dump(mode="json")` (тест на равенство).
+  - [x] `AnalysisReady` несёт путь SRT; `on_analysis` использует его, не
     пересобирает (тест: изменение `TRANSCRIBER__ARTIFACTS_DIR` не ломает доставку).
-  - [ ] `Section(facts=...)` — `Field(default_factory=dict)`.
-  - [ ] Рендер кэширует шаблон (тест: повторный `render` не читает файл с диска).
+  - [x] `Section(facts=...)` — `Field(default_factory=list)`.
+  - [x] Рендер кэширует шаблон (тест: повторный `render` не читает файл с диска).
 
 ### T-2.5 UrlValidator: нормализация и повторная валидация
 - Находки: P2-7. Зависимости: нет.

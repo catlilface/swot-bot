@@ -104,6 +104,123 @@ def test_renderer_includes_time_and_fact(tmp_path: Path) -> None:
     assert "01:05" in text
 
 
+# --- T-2.4: title, SRT из ивента, кэш шаблонов -----------------------------
+
+
+def test_renderer_caches_templates(tmp_path: Path) -> None:
+    """T-2.4: шаблон компилируется один раз; подмена файла не перечитывается."""
+    tdir = tmp_path / "templates"
+    tdir.mkdir()
+    tpl = tdir / "result_message.html.j2"
+    tpl.write_text("Первая: {{ summary.title }}", encoding="utf-8")
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({"title": "X"}), encoding="utf-8")
+    r = MessageRenderer(template_dir=tdir)
+    assert r.render(summary) == "Первая: X"
+    # Файл шаблона изменился на диске — рендер остаётся на кэше
+    tpl.write_text("Вторая: {{ summary.title }}", encoding="utf-8")
+    assert r.render(summary) == "Первая: X"
+
+
+class RecordingDocumentBot:
+    """aiogram.Bot double: records both messages and documents."""
+
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+        self.documents: list[str] = []  # filename
+
+    async def send_message(self, chat_id: int, text: str, **kwargs: Any) -> str:
+        self.messages.append(text)
+        return text
+
+    async def send_document(self, chat_id: int, document: Any, **kwargs: Any) -> None:
+        self.documents.append(document.filename)
+
+
+async def test_title_from_summary_reaches_bot_message(tmp_path: Path) -> None:
+    """T-2.4: заголовок из download (в summary.json) попал в сообщение бота."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID("00000000-0000-0000-0000-000000000021")
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(
+            {
+                "title": "Квантовая механика: основы",
+                "summary": "Резюме",
+                "sections": [
+                    {"heading": "Р1", "facts": [{"text": "Ф", "start_sec": 0}]}
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-21",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Квантовая механика: основы",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    assert "Квантовая механика: основы" in bot.messages[0]
+    assert bot.documents == []
+
+
+async def test_bot_uses_srt_path_from_event(tmp_path: Path) -> None:
+    """T-2.4: SRT доставляется по пути из ивента, а не пересобранный из
+    конфига бота: меняем «TRANSCRIBER__ARTIFACTS_DIR» (layout tasks/<id>) —
+    доставка не ломается."""
+    root = tmp_path / "shared"  # общий том: и бота, и транскрибера
+    task_id = UUID("00000000-0000-0000-0000-000000000022")
+    (root / str(task_id)).mkdir(parents=True)
+    (root / str(task_id) / "summary.json").write_text(
+        json.dumps(
+            {"title": "Л", "summary": "Р", "sections": []}, ensure_ascii=False
+        ),
+        encoding="utf-8",
+    )
+    # Транскрибер пишет SRT в своём layout: <transcriber_dir>/<task>/transcript.srt
+    srt_dir = root / "tasks" / str(task_id)
+    srt_dir.mkdir(parents=True)
+    srt = srt_dir / "transcript.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:02,000\nТекст\n", encoding="utf-8")
+
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(root),  # бот «думает», что его artifacts — корень тома
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-22",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(root / str(task_id)),
+            summary_path=str(root / str(task_id) / "summary.json"),
+            title="Л",
+            srt_path=str(srt),  # путь из ивента — вне старого layout бота
+        )
+    )
+    assert len(bot.messages) == 1
+    assert bot.documents == ["transcript.srt"]
+
+
 # --- T-1.7: доставка (ретраи, nack, нормализованные сообщения) -------------
 
 
