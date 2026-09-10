@@ -6,7 +6,8 @@ from pathlib import Path
 from uuid import UUID
 
 from dishka import make_async_container
-from swot_bus import FakeBus, InMemoryJobRegistry, RegistryProvider
+from fakes import FakeBus
+from swot_bus import InMemoryJobRegistry, RegistryProvider
 from swot_contracts import DownloadRequest, JobProgress, JobStatus, SourceRef
 from swot_contracts.ports import JobRegistry
 from swot_downloader.domain import DownloadedMedia

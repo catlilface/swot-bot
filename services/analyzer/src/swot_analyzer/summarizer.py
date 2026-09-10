@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from .domain import Fact, Section, SummarizeError, Summary
+from .domain import SummarizeError, Summary
 from .prompts import REDUCE_PROMPT
 
 
@@ -81,15 +81,3 @@ class LlmSummarizer:
         chain = template | structured_llm
         result = await chain.ainvoke({"input": text})
         return Summary.model_validate(result)
-
-
-class StubSummarizer:
-    """Deterministic summarizer for tests (no LLM)."""
-
-    async def summarize(self, transcript: str, prompt: str) -> Summary:
-        return Summary(
-            summary="Краткое резюме.",
-            sections=[
-                Section(heading="Раздел", facts=[Fact(text="Факт", start_sec=10)])
-            ],
-        )

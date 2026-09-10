@@ -1,9 +1,10 @@
-"""Unit tests for the transcriber service (FakeTranscriber + FakeBus)."""
+"""Unit tests for the transcriber service (stub transcriber + FakeBus)."""
 
 from pathlib import Path
 from uuid import UUID
 
-from swot_bus import FakeBus, InMemoryJobRegistry
+from fakes import FakeBus
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobProgress, JobStatus, SourceRef, VideoDownloaded
 from swot_transcriber.domain import TranscriptResult
 from swot_transcriber.service import TranscribeService

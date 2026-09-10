@@ -10,11 +10,11 @@ from uuid import UUID
 
 import pytest
 from dishka import make_async_container
+from fakes import FakeBusProvider
 from swot_analyzer.providers import AnalyzerAdaptersProvider, AnalyzeServiceProvider
 from swot_analyzer.service import AnalyzeService
 from swot_bot.providers import BotConsumersProvider, BotHandlersProvider
 from swot_bus import InMemoryJobRegistry, RegistryProvider
-from swot_bus.providers import FakeBusProvider
 from swot_contracts import get_settings
 from swot_contracts.ports import JobRegistry
 from swot_downloader.providers import (

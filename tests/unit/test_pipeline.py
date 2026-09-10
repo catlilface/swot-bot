@@ -7,10 +7,11 @@ event is synchronously handed to the next stage, mimicking RabbitMQ bindings.
 from pathlib import Path
 from uuid import uuid4
 
+from fakes import FakeBus
 from swot_analyzer.domain import Fact, Section, Summary
 from swot_analyzer.service import AnalyzeService
 from swot_bot.renderer import MessageRenderer
-from swot_bus import FakeBus, InMemoryJobRegistry
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import (
     AnalysisReady,
     BaseMessage,

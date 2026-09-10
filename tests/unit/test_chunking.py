@@ -8,9 +8,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
+from fakes import FakeBus
 from swot_analyzer.domain import Fact, Section, SummarizeError, Summary
 from swot_analyzer.summarizer import LlmSummarizer
-from swot_bus import FakeBus, InMemoryJobRegistry
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import SourceRef, VideoDownloaded
 from swot_transcriber.asr import OpenaiAsrTranscriber
 from swot_transcriber.domain import TranscribeError

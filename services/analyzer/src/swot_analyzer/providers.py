@@ -9,7 +9,7 @@ from swot_contracts.ports import JobRegistry
 from .domain import PromptProvider, Summarizer
 from .prompts import LangfusePromptProvider, LocalPromptProvider
 from .service import AnalyzeService
-from .summarizer import LlmSummarizer, StubSummarizer
+from .summarizer import LlmSummarizer
 
 
 class AnalyzerAdaptersProvider(Provider):
@@ -65,15 +65,3 @@ class AnalyzeServiceProvider(Provider):
             registry=registry,
             artifacts_dir=settings.artifacts_dir,
         )
-
-
-class StubAnalyzerProvider(Provider):
-    """Test provider: stub summarizer + local prompt (no LLM/network)."""
-
-    @provide(scope=Scope.APP)
-    def summarizer(self) -> Summarizer:
-        return StubSummarizer()
-
-    @provide(scope=Scope.APP)
-    def prompt_provider(self) -> PromptProvider:
-        return LocalPromptProvider()

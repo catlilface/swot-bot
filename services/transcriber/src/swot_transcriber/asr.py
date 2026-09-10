@@ -1,4 +1,4 @@
-"""OpenAI-compatible ASR Transcriber implementation + FakeTranscriber.
+"""OpenAI-compatible ASR Transcriber implementation.
 
 Long audio is chunked (ffmpeg ``segment`` muxer, ``Segmenter`` port) so each
 ASR call uploads at most ~10–15 minutes of audio instead of the whole
@@ -145,28 +145,3 @@ def _srt_lines_from_records(records: list[dict]) -> list[str]:
         lines.append(rec["text"])
         lines.append("")
     return lines
-
-
-class FakeTranscriber:
-    """Deterministic transcriber for tests (no network / no ASR endpoint)."""
-
-    async def transcribe(self, audio_path: Path, out_dir: Path) -> TranscriptResult:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        srt = out_dir / "transcript.srt"
-        segs = out_dir / "segments.json"
-        srt.write_text(
-            "1\n00:00:00,000 --> 00:00:05,000\nПривет, это тестовая лекция.\n\n",
-            encoding="utf-8",
-        )
-        segs.write_text(
-            json.dumps(
-                [{"start": 0.0, "end": 5.0, "text": "Привет, это тестовая лекция."}]
-            ),
-            encoding="utf-8",
-        )
-        return TranscriptResult(
-            base_dir=out_dir,
-            srt_path=srt,
-            segments_path=segs,
-            language="ru",
-        )

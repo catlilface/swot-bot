@@ -2,7 +2,8 @@
 
 from uuid import UUID
 
-from swot_bus import FakeBus, InMemoryJobRegistry
+from fakes import FakeBus
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobFailed, JobStatus
 from swot_downloader.reaper import JobReaper
 

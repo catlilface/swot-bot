@@ -1,13 +1,17 @@
-"""In-memory MessageBus for tests (implements contracts.MessageBus)."""
+"""Test doubles for the message bus (kept out of production code, T-2.3).
+
+Import as ``from fakes import FakeBus, FakeBusProvider`` — the ``tests/unit``
+directory is on ``sys.path`` during pytest runs (rootdir import mode).
+"""
 
 from collections.abc import Awaitable, Callable
-from typing import Any
 
-from swot_contracts import BaseMessage
+from dishka import Provider, Scope, provide
+from swot_contracts import BaseMessage, MessageBus
 
 
 class FakeBus:
-    """Routes published messages to registered in-memory consumers.
+    """In-memory MessageBus: routes published messages to registered consumers.
 
     With ``capture=True`` also records all published messages for assertions.
     """
@@ -33,8 +37,16 @@ class FakeBus:
     async def close(self) -> None:
         self._handler = None
 
-    def published_types(self) -> list[Any]:
+    def published_types(self) -> list:
         return [m.msg_type for m in self.published]
 
     def get(self, index: int = 0) -> BaseMessage:
         return self.published[index]
+
+
+class FakeBusProvider(Provider):
+    """Dishka provider: in-memory MessageBus instead of RabbitMQ (tests only)."""
+
+    @provide(scope=Scope.APP)
+    def bus(self) -> MessageBus:
+        return FakeBus()

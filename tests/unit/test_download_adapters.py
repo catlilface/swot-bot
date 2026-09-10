@@ -17,7 +17,8 @@ from uuid import UUID
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
-from swot_bus import FakeBus, InMemoryJobRegistry
+from fakes import FakeBus
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import DownloadRequest, JobStatus, SourceRef
 from swot_downloader.adapters import (
     DirectHttpAdapter,

@@ -6,7 +6,7 @@ from dishka import Provider, Scope, provide
 from swot_contracts import MessageBus, Settings
 from swot_contracts.ports import JobRegistry
 
-from .asr import FakeTranscriber, OpenaiAsrTranscriber
+from .asr import OpenaiAsrTranscriber
 from .domain import AudioExtractor, Segmenter, Transcriber
 from .ffmpeg import FfmpegAudioExtractor, FfmpegSegmenter
 from .service import TranscribeService
@@ -57,11 +57,3 @@ class TranscribeServiceProvider(Provider):
             registry=registry,
             media_dir=settings.media_dir,
         )
-
-
-class FakeTranscriberProvider(Provider):
-    """Test provider: fake transcriber (no ASR endpoint), real ffmpeg extractor."""
-
-    @provide(scope=Scope.APP)
-    def transcriber(self) -> Transcriber:
-        return FakeTranscriber()

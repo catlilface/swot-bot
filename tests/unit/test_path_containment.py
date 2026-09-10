@@ -6,9 +6,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from fakes import FakeBus
 from swot_analyzer.service import AnalyzeService
 from swot_bot.handlers import ResultReporter
-from swot_bus import FakeBus, InMemoryJobRegistry
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import (
     AnalysisReady,
     JobStatus,

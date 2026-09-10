@@ -4,9 +4,10 @@ from json import load
 from pathlib import Path
 from uuid import UUID
 
+from fakes import FakeBus
 from swot_analyzer.domain import Fact, Section, Summary
 from swot_analyzer.service import AnalyzeService
-from swot_bus import FakeBus, InMemoryJobRegistry
+from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobProgress, JobStatus, SourceRef, TranscriptReady
 
 
