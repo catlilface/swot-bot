@@ -65,6 +65,84 @@ jobs:
           done
           docker run --rm swot-bot-bot python -c "import aiogram, aio_pika, structlog; print('smoke deps OK')"
 
+      # Tag with the names docker-compose.slim.yml expects on the server, so a
+      # `docker load` + `docker compose up -d` there reuses these images (no local build).
+      - name: Tag images for deployment
+        run: |
+          for svc in bot downloader transcriber analyzer; do
+            docker tag "swot-bot-$svc" "swot-bot/$svc:dev"
+          done
+
+      - name: Save images to artifact
+        run: |
+          docker save swot-bot/bot:dev swot-bot/downloader:dev \
+            swot-bot/transcriber:dev swot-bot/analyzer:dev -o swot-images.tar
+          gzip -9 swot-images.tar
+          ls -lh swot-images.tar.gz
+
+      - name: Upload images artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: swot-images
+          path: swot-images.tar.gz
+          retention-days: 7
+
+  # Deploys the CI-built images to the server over SSH: `docker load` + `docker compose up -d`
+  # (no image build on the server).
+  # Required secrets: SSH_HOST, SSH_USERNAME, SSH_KEY (private key).
+  # Optional secret:  DEPLOY_DIR (server path with the repo + .env; default ~/swot-bot).
+  # Without SSH secrets the job is skipped (green) — manual deploy via scripts/deploy.sh.
+  deploy:
+    needs: docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SSH deploy secrets
+        id: gate
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "SSH_HOST secret not set — skipping deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download image artifact
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: swot-images
+          path: artifact
+
+      - name: Copy images to server
+        if: steps.gate.outputs.enabled == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: artifact/swot-images.tar.gz
+          target: /tmp
+
+      - name: Load images and start stack
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${DEPLOY_DIR:-$HOME/swot-bot}"
+            docker load -i /tmp/swot-images.tar.gz
+            rm -f /tmp/swot-images.tar.gz
+            docker compose -f docker-compose.slim.yml up -d
+            docker compose -f docker-compose.slim.yml ps
+
   compose-integration:
     runs-on: ubuntu-latest
     # The dev stack (fakes as Telegram/ASR/LLM + Langfuse) is the CI stack;
@@ -74,7 +152,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start stack (dev compose file: fakes as Telegram/ASR/LLM)
+      - name: "Start stack (dev compose file: fakes as Telegram/ASR/LLM)"
         run: |
           cp .env.example .env
           docker compose up -d --build

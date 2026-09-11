@@ -66,44 +66,7 @@ docker compose -f docker-compose.dev.yml logs -f fake-tg   # ответы бот
 | `asr-service`, `llm-service` | фэйки (OpenAI-совместимые) |
 | `fake-tg` | заглушка Telegram Bot API (`POST /inject`) |
 
-### Dev-режим (fakes) и их семантика
-
-Единственный dev-режим в проекте — отдельные контейнеры dev-стека:
-`asr-service`, `llm-service` (OpenAI-совместимые фэйки, `services/fake/fake_openai.py`)
-и `fake-tg` (заглушка Telegram Bot API, `services/fake/fake_telegram.py`; образ
-`swot-bot/fake:dev`). Они существуют только в `docker-compose.dev.yml`, не входят
-в образы сервисов пайплайна (их Dockerfile копируют только `packages/` и
-свой `services/<svc>/`) и не активны, когда dev-стек не поднят.
-
-Внутри процессов сервисов фэйков нет (T-2.3): in-process-двойники
-(`FakeBus`, `FakeTranscriber` / `FakeTranscriberProvider`, `StubSummarizer`
-и их `dishka`-провайдеры) удалены из production-модулей —
-`FakeTranscriberProvider` в коде больше не существует, поэтому он не
-регистрируется ни по умолчанию, ни по какому-либо флагу; активировать
-in-process-фейки нечем. Тестовые двойники (`FakeBus` + `FakeBusProvider`)
-живут в `tests/unit/fakes.py` и используются только из тестов.
-
-Следствие: в production-контейнерах (реальные ASR/LLM/Telegram) фэйки
-включить невозможно без явного изменения стека — только теми же
-compose-контейнерами, которые оператор осознанно включает в dev-стек.
-
-### Переход на реальные зависимости
-
-Комментировать контейнеры больше не нужно — реальные режимы это отдельные
-файлы (таблица выше), dev-стек остаётся нетронутым:
-
-- **`docker-compose.slim.yml`** (внешние ASR/LLM): в `.env` —
-  `TELEGRAM__TOKEN=<токен BotFather>`, `TELEGRAM__API_BASE_URL=` (пусто =
-  `api.telegram.org`), реальные `TELEGRAM__ADMIN_ID` / `TELEGRAM__TARGET_CHAT_ID`;
-  `LLM__API_URL` (с `http(s)://`) / `LLM__API_KEY` / `LLM__MODEL_ID`;
-  `TRANSCRIBER__API_URL` / `TRANSCRIBER__API_KEY` / `TRANSCRIBER__MODEL`.
-- **`docker-compose.full.yml`** (свои ASR/LLM в стеке): Telegram — то же самое;
-  ASR/LLM уже в стеке (`whisper-server` + `ollama`), модели выбираются
-  `ASR_MODEL` (tiny/base/small/medium/large-v3-turbo) и `LLM_OLLAMA_MODEL`
-  (любая модель ollama, https://ollama.com/library). GPU: `ASR_DEVICE=cuda`
-  + `ASR_IMAGE_TAG=cuda`; для ollama раскомментировать GPU-блок в compose.
-
-### Optional services
+### Интеграция с другими сущностями
 
 - **Langfuse** (v3) — входит в dev-стек `docker-compose.dev.yml` (T-2.8):
   `langfuse` (UI — http://localhost:3000) + `langfuse-worker` + Postgres,
