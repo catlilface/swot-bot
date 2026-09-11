@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           sha="$GITHUB_SHA"
           for i in $(seq 1 60); do
-            runs="$(gh run list --workflow=ci.yml --branch=main --limit=50 \
+            runs="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow=ci.yml --branch=main --limit=50 \
               --json databaseId,headSha,status)"
             ok="$(jq -r --arg sha "$sha" \
               '.[] | select(.headSha == $sha and .status == "success") | .databaseId' \
@@ -64,7 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download "${{ steps.ci.outputs.run_id }}" --name swot-images
+          gh run download --repo "$GITHUB_REPOSITORY" "${{ steps.ci.outputs.run_id }}" --name swot-images
           ls -lh swot-images.tar.gz
 
       - name: Copy images to the server
