@@ -176,12 +176,14 @@ class _FakeBot:
 
 def _make_reporter(artifacts: Path, bot: _FakeBot) -> ResultReporter:
     from swot_bot.renderer import MessageRenderer
+    from swot_bot.tags import TagGate
 
     return ResultReporter(
         bot=bot,  # type: ignore[arg-type]
         target_chat_id=1,
         renderer=MessageRenderer(),
         artifacts_dir=str(artifacts),
+        tags=TagGate(),
     )
 
 

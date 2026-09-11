@@ -117,7 +117,9 @@ async def test_duration_rejected_before_download(tmp_path: Path) -> None:
 
 async def test_ytdlp_happy_path_audio_format(tmp_path: Path) -> None:
     """Normal flow: metadata → duration check → download; audio-first
-    format is passed to yt-dlp; metadata lands in DownloadedMedia."""
+    format is passed to yt-dlp (with a bounded video fallback for sources
+    without an audio-only format, e.g. Yandex Disk); metadata lands in
+    DownloadedMedia."""
     calls: list[bool] = []
     seen_opts: list[dict] = []
 
@@ -136,7 +138,12 @@ async def test_ytdlp_happy_path_audio_format(tmp_path: Path) -> None:
     )
     # metadata phase first, then download
     assert calls == [False, True]
-    assert all(o["format"] == "bestaudio[acodec=none]/bestaudio" for o in seen_opts)
+    # audio-first: чистый аудио пробуется первым; фолбэк на низкое видео
+    # (<=480p) — для источников без аудио-трека (Yandex Disk отдаёт только video).
+    assert all(
+        o["format"].startswith("bestaudio[acodec=none]/bestaudio/")
+        for o in seen_opts
+    )
     assert media.title == "Lecture 1"
     assert media.duration_sec == 600
     assert media.resource_id == "res-1"

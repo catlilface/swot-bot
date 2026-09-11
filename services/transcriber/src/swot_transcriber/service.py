@@ -1,6 +1,7 @@
 """Transcriber application service: consumes video.downloaded -> transcript.ready."""
 
 import logging
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -81,6 +82,7 @@ class TranscribeService:
                 result.srt_path,
             )
             self._cleanup_media(media, self._media_dir)
+            self._cleanup_work(work, self._artifacts_dir)
         except Exception as exc:  # noqa: BLE001
             logger.exception(
                 "transcribe failed: task_id=%s trace_id=%s",
@@ -116,6 +118,28 @@ class TranscribeService:
             resolved.unlink(missing_ok=True)
         except OSError as exc:
             logger.warning("media cleanup failed: path=%s error=%s", media_path, exc)
+
+    @staticmethod
+    def _cleanup_work(work: Path, artifacts_dir: Path) -> None:
+        """Remove the audio working dir (audio.wav + chunks) after transcription.
+
+        The video is removed by :meth:`_cleanup_media`; this frees the rest of
+        the heavy artifacts once the transcript is on the volume (P1-11).
+        Refuses to touch anything outside *artifacts_dir* (P0-6).
+        """
+        try:
+            resolved = resolve_under(artifacts_dir, str(work))
+        except ValueError as exc:
+            logger.warning(
+                "work cleanup refused (outside artifacts dir): path=%s error=%s",
+                work,
+                exc,
+            )
+            return
+        try:
+            shutil.rmtree(resolved)
+        except OSError as exc:
+            logger.warning("work cleanup failed: path=%s error=%s", work, exc)
 
     async def run(self) -> None:
         async def dispatch(message: BaseMessage) -> None:

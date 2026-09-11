@@ -33,8 +33,18 @@ docker compose -f docker-compose.dev.yml ps   # всё running/healthy чере�
 curl -X POST http://localhost:8081/inject \
   -H 'Content-Type: application/json' \
   -d '{"text": "http://fake-tg:8081/media/sample.wav"}'
+```
 
-docker compose -f docker-compose.dev.yml logs -f fake-tg   # ответ бота (summary + SRT) логируется здесь
+Бот подтверждает задачу и просит тег с названием предмета — следующее
+инжект-сообщение трактуется как тег (нормализуется в нижний регистр с
+подчёркиваниями и досылается в конце результата):
+
+```bash
+curl -X POST http://localhost:8081/inject \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Высшая Математика"}'   # → «высшая_математика» в конце результата
+
+docker compose -f docker-compose.dev.yml logs -f fake-tg   # ответы бота (summary + SRT + тег) логируются здесь
 ```
 
 Пример ссылки: платформа (YouTube, VK, Rutube, диск, Drive…)
@@ -49,7 +59,7 @@ docker compose -f docker-compose.dev.yml logs -f fake-tg   # ответ бота
 | сервис | роль |
 |---|---|
 | `rabbitmq` | broker (dev-пользователь `swot`/`swot`, UI на `:15672`) |
-| `bot` | aiogram-бот: принимает ссылки, публикует результат |
+| `bot` | aiogram-бот: принимает ссылки и теги предметов, публикует результат |
 | `downloader` | качает видео (yt-dlp / прямое HTTP), извлекает медиа |
 | `transcriber` | извлекает аудио (ffmpeg) и шлёт в ASR |
 | `analyzer` | LLM-выжимка с фактами и таймкодами |
@@ -105,10 +115,3 @@ compose-контейнерами, которые оператор осознан
   вообще (fallback на локальный промпт, T-0.4). Чтобы отключить трейсинг —
   зачистить `LANGFUSE__PUBLIC_KEY/SECRET_KEY`. **Postgres** ходит вместе с
   Langfuse; отдельно боту не нужен.
-
-## Документация
-
-- [docs/architecture.md](docs/architecture.md) — каноническая архитектура
-  (пайплайн, контракты, адаптеры источников, безопасность, dev-стек).
-- [todo/plan.md](todo/plan.md) — этапный план работ; исследование —
-  [audit.md](audit.md), снимки ревью — `reviews/`.

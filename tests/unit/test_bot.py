@@ -12,6 +12,7 @@ from aiogram.exceptions import TelegramRetryAfter
 from aiogram.methods import GetMe
 from swot_bot.handlers import ResultReporter, _chunk_text, _kind_for
 from swot_bot.renderer import MessageRenderer
+from swot_bot.tags import TagGate
 from swot_bot.validation import UrlValidator
 from swot_contracts import AnalysisReady, JobFailed, JobProgress, SourceRef
 
@@ -91,12 +92,13 @@ async def test_bot_progress_labels_and_fallback() -> None:
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir="/tmp",
+        tags=TagGate(),
     )
     task_id = UUID("00000000-0000-0000-0000-000000000011")
     for stage, _expected in (
-        ("downloading", "⬇️ Скачиваю… (downloading)"),
-        ("transcribing", "📝 Транскрибирую… (transcribing)"),
-        ("analyzing", "🧠 Анализирую… (analyzing)"),
+        ("downloading", "Скачиваю…"),
+        ("transcribing", "Транскрибирую…"),
+        ("analyzing", "Анализирую…"),
         ("weird_stage", "weird_stage (weird_stage)"),
     ):
         await reporter.on_progress(
@@ -185,6 +187,7 @@ async def test_title_from_summary_reaches_bot_message(tmp_path: Path) -> None:
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir=str(artifacts),
+        tags=TagGate(),
         retry_delays=(),
     )
     await reporter.on_analysis(
@@ -226,6 +229,7 @@ async def test_bot_uses_srt_path_from_event(tmp_path: Path) -> None:
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir=str(root),  # бот «думает», что его artifacts — корень тома
+        tags=TagGate(),
         retry_delays=(),
     )
     await reporter.on_analysis(
@@ -302,6 +306,7 @@ async def test_delivery_rate_limited_twice_then_delivered_no_nack(
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir=str(tmp_path),
+        tags=TagGate(),
         retry_delays=(0.0, 0.0, 0.0),
     )
     bus = NackBus()
@@ -327,6 +332,7 @@ async def test_delivery_retries_exhausted_then_nack(tmp_path: Path) -> None:
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir=str(tmp_path),
+        tags=TagGate(),
         retry_delays=(0.0, 0.0),
     )
     bus = NackBus()
@@ -354,6 +360,7 @@ async def test_missing_summary_gets_normalized_notice(tmp_path: Path) -> None:
         target_chat_id=42,
         renderer=MessageRenderer(),
         artifacts_dir=str(artifacts),
+        tags=TagGate(),
         retry_delays=(),
     )
     task_id = UUID("00000000-0000-0000-0000-0000000000f3")
@@ -398,3 +405,222 @@ def test_chunk_text_cut_lands_on_tag_boundary() -> None:
     for c in chunks:
         assert re.search(r"<[^>]*$", c) is None
         assert not c.startswith(">")
+
+
+# --- Тег предмета: добавляется в конец результата ---------------------------
+
+
+async def test_result_message_ends_with_normalized_tag(tmp_path: Path) -> None:
+    """Принятый тег (из handle_link) досылается в конце готового результата."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x31)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    bot = RecordingDocumentBot()
+    tags = TagGate()
+    tags.put_tag(task_id, "высшая_математика")  # как принято в handle_link
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=tags,
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-31",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    assert bot.messages[0].endswith("\n\nвысшая_математика")
+    # После доставки состояние снято: тег не доработается к следующей задаче.
+    assert tags.tag_for(task_id) is None
+
+
+async def test_result_without_tag_has_no_tag_line(tmp_path: Path) -> None:
+    """Нет принятого тега → сообщение без строки (как раньше)."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x32)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    bot = RecordingDocumentBot()
+    tags = TagGate()  # тег так и не прислан
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=tags,
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-32",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert "" not in bot.messages[0]
+
+
+async def test_failed_clears_tag_state() -> None:
+    """Провал задачи снимает и «ожидание тега», и принятый тег."""
+    bot = RecordingDocumentBot()
+    tags = TagGate()
+    task_id = UUID(int=0x33)
+    tags.await_tag(task_id)
+    tags.put_tag(task_id, "физика")
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir="/tmp",
+        tags=tags,
+        retry_delays=(),
+    )
+    await reporter.on_failed(
+        JobFailed(
+            task_id=task_id, trace_id="t-33",
+            stage="download", error="boom",
+        )
+    )
+    assert tags.pop_next() is None
+    assert tags.tag_for(task_id) is None
+    assert "033" in bot.messages[-1]  # провал админу всё же доходит
+
+
+# --- Исходная ссылка в результате + очистка транскрипции -------------------
+
+
+async def test_result_includes_original_source_link(tmp_path: Path) -> None:
+    """Исходная ссылка админа попадает в результат: HTML-экранированная,
+    до строки с тегом (тег остаётся последней строкой)."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x34)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    bot = RecordingDocumentBot()
+    tags = TagGate()
+    tags.put_tag(task_id, "история")
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=tags,
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-34",
+            source=SourceRef(url="https://disk.yandex.ru/i/abc?e=1&v=2"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    text = bot.messages[0]
+    # «&» в URL экранирован для Telegram HTML, иначе parse ломается.
+    assert "🔗 https://disk.yandex.ru/i/abc?e=1&amp;v=2" in text
+    assert text.index("🔗") < text.rindex("")
+    assert text.endswith("история")
+
+
+async def test_transcript_artifacts_removed_after_delivery(tmp_path: Path) -> None:
+    """После доставки в Telegram транскрипция (SRT + segments.json) удаляется;
+    сам summary остаётся на томе."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x35)
+    tdir = artifacts / str(task_id)
+    tdir.mkdir(parents=True)
+    summary = tdir / "summary.json"
+    summary.write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    srt = tdir / "transcript.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:02,000\nТекст\n", encoding="utf-8")
+    segments = tdir / "segments.json"
+    segments.write_text("[]", encoding="utf-8")
+
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-35",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(tdir),
+            summary_path=str(summary),
+            title="Лекция",
+            srt_path=str(srt),
+        )
+    )
+    assert len(bot.messages) == 1
+    assert bot.documents == ["transcript.srt"]  # сам документ доставлен
+    # …и после доставки файл больше не нужен.
+    assert not srt.exists()
+    assert not segments.exists()
+    assert summary.exists()  # summary — артефакт аналитика, не транскрипции
+
+
+async def test_transcript_cleanup_refuses_paths_outside_artifacts(tmp_path: Path) -> None:
+    """segments.json вне корня artifacts не трогается (containment, P0-6);
+    доставка при этом не ломается."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x36)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    alien = tmp_path / "alien"
+    alien.mkdir()
+    (alien / "segments.json").write_text("[]", encoding="utf-8")
+
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-36",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(alien),  # вне корня artifacts бота
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    assert (alien / "segments.json").exists()

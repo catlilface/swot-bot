@@ -18,6 +18,7 @@ from swot_contracts import (
 
 from .handlers import ResultReporter, build_router
 from .renderer import MessageRenderer
+from .tags import TagGate
 from .validation import UrlValidator
 
 
@@ -51,17 +52,23 @@ class BotHandlersProvider(Provider):
         return MessageRenderer()
 
     @provide(scope=Scope.APP)
+    def tag_gate(self) -> TagGate:
+        return TagGate()
+
+    @provide(scope=Scope.APP)
     def reporter(
         self,
         bot: aiogram.Bot,
         settings: Settings,
         renderer: MessageRenderer,
+        tags: TagGate,
     ) -> ResultReporter:
         return ResultReporter(
             bot=bot,
             target_chat_id=settings.telegram.target_chat_id or 0,
             renderer=renderer,
             artifacts_dir=settings.artifacts_dir,
+            tags=tags,
         )
 
 

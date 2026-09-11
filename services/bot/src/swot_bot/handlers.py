@@ -1,11 +1,12 @@
 """Telegram message handlers with dishka-injected dependencies."""
 
 import asyncio
+import html
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import structlog.contextvars
 from aiogram import Bot, F, Router
@@ -29,6 +30,7 @@ from swot_contracts.ports import JobRegistry
 
 from .filters import IsAdmin
 from .renderer import MessageRenderer
+from .tags import TagGate, normalize_tag
 from .validation import UrlValidator
 
 logger = logging.getLogger(__name__)
@@ -86,13 +88,22 @@ async def handle_link(
     bus: FromDishka[MessageBus],
     registry: FromDishka[JobRegistry],
     validator: FromDishka[UrlValidator],
+    tags: FromDishka[TagGate],
 ) -> None:
-    """Одиночное текстовое сообщение трактуется как ссылка на видео.
+    """Одиночное текстовое сообщение: тег для ожидающей задачи или ссылка.
 
-    Module-level function (not nested in ``build_router``) so the
-    validation branches are directly unit-testable (T-2.7).
+    Если после последней ссылки ещё не прислан тег предмета, сообщение
+    трактуется как тег (нормализуется и сохраняется к задаче). Иначе —
+    как ссылка на видео. Module-level function (not nested in
+    ``build_router``) so the branches are directly unit-testable (T-2.7).
     """
     user_text = (message.text or "").strip()
+
+    pending_id = tags.pop_next()
+    if pending_id is not None:
+        await _accept_tag(message, tags, pending_id, user_text)
+        return
+
     if not user_text.startswith(("http://", "https://")):
         await message.answer("Пришли ссылку на лекцию.")
         return
@@ -124,9 +135,33 @@ async def handle_link(
                 source=SourceRef(url=url, kind=_kind_for(url)),
             )
         )
-        await message.answer("✅ Задача принята, обрабатываю…")
+        # Следующее сообщение админа — тег предмета (FIFO, см. TagGate).
+        tags.await_tag(task_id)
+        await message.answer(
+            "Задача принята, обрабатываю…\n"
+            "Теперь пришли тег с названием предмета (например: «Высшая Математика»)."
+        )
     finally:
         structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
+
+
+async def _accept_tag(
+    message: Message, tags: TagGate, pending_id: UUID, user_text: str
+) -> None:
+    """Попробовать обработать сообщение как тег предмета ожидающей задачи."""
+    if user_text.startswith(("http://", "https://")):
+        tags.await_tag(pending_id)
+        await message.answer(
+            "Сначала пришли тег с названием предмета (не ссылку)."
+        )
+        return
+    tag = normalize_tag(user_text)
+    if not tag:
+        tags.await_tag(pending_id)
+        await message.answer("Тег не может быть пустым — пришли название предмета.")
+        return
+    tags.put_tag(pending_id, tag)
+    await message.answer(f"Тег «{tag}» принят — добавлю его в конец результата.")
 
 
 def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
@@ -152,12 +187,14 @@ class ResultReporter:
         target_chat_id: int,
         renderer: MessageRenderer,
         artifacts_dir: str,
+        tags: TagGate,
         retry_delays: Sequence[float] = _DEFAULT_RETRY_DELAYS,
     ) -> None:
         self._bot = bot
         self._target = target_chat_id
         self._renderer = renderer
         self._artifacts = Path(artifacts_dir)
+        self._tags = tags
         self._retry_delays = tuple(retry_delays)
 
     async def _send(self, send: Callable[[], Awaitable[Any]], *, what: str) -> None:
@@ -198,7 +235,7 @@ class ResultReporter:
         await self._send(
             lambda: self._bot.send_message(
                 self._target,
-                "⚠️ Не удалось доставить результат задачи "
+                "Не удалось доставить результат задачи "
                 f"{msg.task_id} — подробности в логах бота.",
             ),
             what="delivery-failed notice",
@@ -233,6 +270,16 @@ class ResultReporter:
             raise ValueError(f"summary path unavailable: {msg.summary_path!r}")
 
         text = self._renderer.render(summary)
+        # Исходная ссылка админа — в конце результата (до строки с тегом);
+        # экранируем под Telegram HTML-разметку (иначе & в URL ломает parse).
+        if msg.source.url:
+            text = (
+                f"{text.rstrip()}\n\n🔗 {html.escape(msg.source.url, quote=False)}"
+            )
+        tag = self._tags.tag_for(msg.task_id)
+        if tag:
+            # Тег предмета — в конце результата (собирается в handle_link).
+            text = f"{text.rstrip()}\n\n #{tag}"
         for part in _chunk_text(text):
 
             async def send_part(text_part: str = part) -> None:
@@ -251,6 +298,44 @@ class ResultReporter:
                 ),
                 what="srt document",
             )
+        # Задача доставлена: состояние тегов не нужно. Если доставка выше
+        # упала (raise до этой строки) — тег не забыт и попадёт в сообщение
+        # при redelivery ивента с шины.
+        self._tags.forget(msg.task_id)
+        # Транскрибация (SRT + segments.json) после доставки уже не нужна:
+        # удаляем, чтобы не разрастать общий том (P1-11). Best-effort: ошибка
+        # очистки не должна ломать уже успешную доставку.
+        self._cleanup_transcript(msg, srt)
+
+    def _cleanup_transcript(self, msg: AnalysisReady, srt: Path | None) -> None:
+        """Delete SRT + segments.json after delivery (best-effort, P0-6).
+
+        The SRT path comes from the event (already containment-checked in
+        :meth:`_resolve_artifact`); segments.json lives next to it in the
+        analyzer's base dir.
+        """
+        if srt is not None:
+            self._unlink_quietly(srt)
+        if not msg.base_dir:
+            return
+        try:
+            base = resolve_under(self._artifacts, msg.base_dir)
+        except ValueError as exc:
+            logger.warning(
+                "transcript cleanup refused (outside artifacts): path=%s error=%s",
+                msg.base_dir,
+                exc,
+            )
+            return
+        self._unlink_quietly(base / "segments.json")
+
+    @staticmethod
+    def _unlink_quietly(path: Path) -> None:
+        """Best-effort file removal: failures are logged, not raised."""
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("transcript cleanup failed: path=%s error=%s", path, exc)
 
     async def on_analysis(self, msg: AnalysisReady) -> None:
         structlog.contextvars.bind_contextvars(
@@ -292,7 +377,7 @@ class ResultReporter:
             await self._send(
                 lambda: self._bot.send_message(
                     self._target,
-                    f"⚠️ Задача {msg.task_id} не завершилась успешно "
+                    f"Задача {msg.task_id} не завершилась успешно "
                     f"(стадия: {msg.stage}) — подробности в логах.",
                 ),
                 what="failure notice",
@@ -304,6 +389,7 @@ class ResultReporter:
                 msg.stage,
                 msg.error,
             )
+            self._tags.forget(msg.task_id)
         finally:
             structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
 
@@ -313,9 +399,9 @@ class ResultReporter:
         )
         try:
             label = {
-                "downloading": "⬇️ Скачиваю…",
-                "transcribing": "📝 Транскрибирую…",
-                "analyzing": "🧠 Анализирую…",
+                "downloading": "Скачиваю…",
+                "transcribing": "Транскрибирую…",
+                "analyzing": "Анализирую…",
             }.get(msg.stage, msg.stage)
             await self._send(
                 lambda: self._bot.send_message(self._target, f"{label} ({msg.stage})"),

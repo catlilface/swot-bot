@@ -414,6 +414,7 @@ class _RecordingBus:
 
 def _make_bot_container(bus: _RecordingBus, registry: InMemoryJobRegistry) -> object:
     from dishka import Provider, Scope, make_async_container, provide
+    from swot_bot.tags import TagGate
     from swot_bot.validation import UrlValidator
 
     class _Provider(Provider):
@@ -433,6 +434,10 @@ def _make_bot_container(bus: _RecordingBus, registry: InMemoryJobRegistry) -> ob
         @provide(scope=Scope.APP)
         def validator(self) -> UrlValidator:
             return UrlValidator()
+
+        @provide(scope=Scope.APP)
+        def tag_gate(self) -> TagGate:
+            return TagGate()
 
     return make_async_container(_Provider(bus, registry))
 

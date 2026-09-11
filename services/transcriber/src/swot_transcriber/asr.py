@@ -75,8 +75,9 @@ class OpenaiAsrTranscriber:
                     model=self._model,
                     file=(chunk.name, f, "audio/wav"),
                     response_format=self._response_format,
-                    language=self._language or None,
+                    language=self._language or "ru",
                     timeout=self._timeout_sec,
+                    timestamp_granularities=["word", "segment"],
                 )
             language = getattr(result, "language", "") or language
             records.extend(

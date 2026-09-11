@@ -14,6 +14,7 @@ from fakes import FakeBusProvider
 from swot_analyzer.providers import AnalyzerAdaptersProvider, AnalyzeServiceProvider
 from swot_analyzer.service import AnalyzeService
 from swot_bot.providers import BotConsumersProvider, BotHandlersProvider
+from swot_bot.tags import TagGate
 from swot_bus import InMemoryJobRegistry, RegistryProvider
 from swot_contracts import get_settings
 from swot_contracts.ports import JobRegistry
@@ -126,4 +127,8 @@ async def test_bot_request_container_resolves_job_registry(
         task_id = UUID(int=1)
         await registry.create(task_id, "https://example.com/watch?v=test")
         assert await registry.exists(task_id) is True
+        # Тег-шлюз тоже резолвится по типу (единый app-экземпляр: ссылка и тег
+        # приходят отдельными апдейтами).
+        gate = await request_container.get(TagGate)
+        assert isinstance(gate, TagGate)
     await container.close()

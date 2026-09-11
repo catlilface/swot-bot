@@ -68,8 +68,11 @@ class YtDlpAdapter:
     video fallback).
     """
 
-    #: Audio-first format: codec-free best audio, then best audio (no video).
-    FORMAT = "bestaudio[acodec=none]/bestaudio"
+    #: Audio-first format: codec-free best audio, then best audio (no video);
+    #: when the source has no audio-only format (e.g. Yandex Disk HLS is
+    #: video-only), fall back to a low-res video rendition — the transcriber
+    #: extracts the audio afterwards — instead of failing outright.
+    FORMAT = "bestaudio[acodec=none]/bestaudio/best[height<=480]"
 
     def __init__(
         self,

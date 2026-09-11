@@ -14,8 +14,16 @@ E2E without a real Telegram: start the stack, then
         -d '{"text": "http://fake-tg:8081/media/sample.wav"}
 
 The fake update arrives as a message from the configured admin, the bot
-publishes ``download.request`` and later sends the summary + SRT back to the
-"chat" — visible in this container's logs.
+publishes ``download.request`` and asks for the subject tag. The tag is the
+next injected message (normalized, appended to the end of the result):
+
+    curl -X POST http://localhost:8081/inject -H 'Content-Type: application/json' \
+        -d '{"text": "http://fake-tg:8081/media/sample.wav"}'
+    curl -X POST http://localhost:8081/inject -H 'Content-Type: application/json' \
+        -d '{"text": "Высшая Математика"}'
+
+The bot later sends the summary + SRT (with the ``🏷️`` tag at the end) back to
+the "chat" — visible in this container's logs.
 """
 
 from __future__ import annotations

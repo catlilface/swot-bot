@@ -43,6 +43,12 @@ async def test_transcribe_publishes_transcript_ready(tmp_path: Path) -> None:
     assert ready.title == "test"
     # P2-1: READY — только analyzer; после расшифровки — промежуточный статус.
     assert await registry.get_status(task_id) == JobStatus.TRANSCRIBED
+    # После транскрипции рабочие артефакты (work/ с audio.wav) удаляются,
+    # сам транскрипт (srt + segments.json) остаётся на томе — его уберёт бот
+    # после доставки в Telegram.
+    assert not (tmp_path / str(task_id) / "work").exists()
+    assert (tmp_path / str(task_id) / "transcript.srt").exists()
+    assert (tmp_path / str(task_id) / "segments.json").exists()
 
 
 async def test_transcriber_publishes_job_progress(tmp_path: Path) -> None:
