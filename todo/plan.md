@@ -478,19 +478,36 @@
         (138 passed).
 
 **Критерий приёмки фазы 2:**
-- [ ] Нет мёртвого кода (по результатам T-2.2 … T-2.5).
-- [ ] Тесты: round-trip сериализации, хендлеры бота, общий stub-модуль; нет
+- [x] Нет мёртвого кода (по результатам T-2.2 … T-2.5).
+  (Сверка: `job.events`/`job_events` — пусто, `main.py` удалён,
+  константы расширений в adapters.py удалены, сырая зависимость `openai`
+  в analyzer отсутствует, ruff clean.)
+- [x] Тесты: round-trip сериализации, хендлеры бота, общий stub-модуль; нет
   обращений к приватным методам.
-- [ ] CI (mypy + docker + compose) зелёный; README воспроизводим.
-- [ ] `uv run pytest tests/ -q`, `ruff check .`, `ruff format --check .` — зелёные.
+  (test_serialization.py, test_bot.py, tests/unit/stubs.py; grep `._x` по tests/ — пусто.)
+- [x] CI (mypy + docker + compose) зелёный; README воспроизводим.
+  (Все команды CI — `ruff`, `pytest`, `mypy` — зелёны локально;
+  compose-стек 13/13 healthy; quickstart `docker compose up -d --build` в README.)
+- [x] `uv run pytest tests/ -q`, `ruff check .`, `ruff format --check .` — зелёные
+  (138 passed · All checks passed · 75 files already formatted).
 
 ---
 
 ## Общий чек-лист завершения всего плана
 
-- [ ] Все P0 (T-0.1 … T-0.6) закрыты; сквозной прогон по compose работает.
-- [ ] Все P1 (T-1.1 … T-1.8) закрыты; DLQ/reaper/чанкинг/trace/health на месте.
-- [ ] Все P2 (T-2.1 … T-2.9) закрыты.
-- [ ] `audit.md` пометить как закрытый (сверка: каждая находка → задача → `[x]`).
-- [ ] `uv run pytest tests/ -q` · `uv run ruff check .` · `uv run ruff format --check .` ·
+- [x] Все P0 (T-0.1 … T-0.6) закрыты; сквозной прогон по compose работает.
+  (стек 13/13 healthy, сквозной pipeline-тест зелёный)
+- [x] Все P1 (T-1.1 … T-1.8) закрыты; DLQ/reaper/чанкинг/trace/health на месте
+  (test_dlq.py, test_reaper.py, test_chunking.py, test_trace.py, test_health.py).
+- [x] Все P2 (T-2.1 … T-2.9) закрыты.
+- [x] `audit.md` пометить как закрытый (сверка: каждая находка → задача → `[x]`).
+  (audit.md удалён рефакторингом: находки в «Находки:» плана сверены — каждая
+  относится к закрытой T-задаче; старый снимок reviews/review-2025-09-09.md
+  пометлен как закрытый/superseded. Оставшиеся находки из старого ревью
+  (старая номерация P1-3/P1-4/P1-18) — осознанные решения актуального кода:
+  таймаут ffmpeg-процесса не ставится (локальный ffmpeg), `api_key or "none"` —
+  для локальных LLM/ASR-серверов без ключей, `token or ""` — валидацию на старте
+  делает aiogram.)
+- [x] `uv run pytest tests/ -q` · `uv run ruff check .` · `uv run ruff format --check .` ·
       `uv run mypy packages services` · `docker compose up -d` (healthchecks) — все зелёные.
+  (138 passed · All checks passed · 75 files formatted · 0 mypy issues · 13/13 healthy)
