@@ -1,0 +1,100 @@
+# Deploys the CI-built images to the server (docker load + compose up — no build there).
+#
+# Flow: push to main -> wait for a GREEN ci.yml run of the same commit
+# (tests/mypy/compose-integration all passed) -> download its `swot-images`
+# artifact -> ship it to the server -> docker load -> docker compose up -d.
+# If CI fails for the commit, this workflow fails too — old stack keeps running.
+#
+# Required repository secrets:
+#   SERVER_HOST      server address (IP or domain)
+#   SERVER_USER      SSH user
+#   SSH_PRIVATE_KEY  private SSH key (public half -> server's ~/.ssh/authorized_keys)
+# Optional repository secret:
+#   DEPLOY_DIR       directory on the server with the repo checkout + .env
+#                    (default: ~/swot-bot)
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  actions: read # gh: look up the green ci.yml run + download its artifact
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false # a new deploy queues up, never cuts an in-flight one
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for a green ci.yml run of this exact commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="$GITHUB_SHA"
+          for i in $(seq 1 60); do
+            runs="$(gh run list --workflow=ci.yml --branch=main --limit=50 \
+              --json databaseId,headSha,status)"
+            ok="$(jq -r --arg sha "$sha" \
+              '.[] | select(.headSha == $sha and .status == "success") | .databaseId' \
+              <<<"$runs" | head -n1)"
+            bad="$(jq -r --arg sha "$sha" \
+              '.[] | select(.headSha == $sha and (.status == "failure" or .status == "cancelled")) | .databaseId' \
+              <<<"$runs" | head -n1)"
+            if [ -n "${ok:-}" ]; then
+              echo "run_id=${ok}" >> "$GITHUB_OUTPUT"
+              echo "Green CI run ${ok} found for ${sha}"
+              exit 0
+            fi
+            if [ -n "${bad:-}" ]; then
+              echo "::error::ci.yml is not green for ${sha} (failed run: ${bad}) — deploy aborted"
+              exit 1
+            fi
+            echo "CI still running for ${sha} — waiting 60s (attempt ${i}/60)"
+            sleep 60
+          done
+          echo "::error::timed out (1h) waiting for ci.yml to go green on ${sha}"
+          exit 1
+
+      - name: Download prebuilt images (artifact from the green CI run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ steps.ci.outputs.run_id }}" --name swot-images
+          ls -lh swot-images.tar.gz
+
+      - name: Copy images to the server
+        uses: appleboy/scp-action@v2
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: swot-images.tar.gz
+          target: /tmp/
+          overwrite: true
+
+      - name: Load images and start the stack
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true # fail the job on the first error (default is to keep going)
+          script: |
+            set -euo pipefail
+            deploy_dir='${{ secrets.DEPLOY_DIR }}'
+            [ -n "$deploy_dir" ] || deploy_dir="$HOME/swot-bot"
+
+            docker load -i /tmp/swot-images.tar.gz
+            rm -f /tmp/swot-images.tar.gz
+
+            cd "$deploy_dir"
+            # Keep compose file / .env on the server in sync with the deployed commit.
+            git pull --ff-only || echo "WARN: git pull failed — using the existing checkout"
+            docker compose -f docker-compose.slim.yml up -d
+            docker image prune -f # drop the previous versions of the 4 images
+            docker compose -f docker-compose.slim.yml ps
