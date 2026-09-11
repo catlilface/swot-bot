@@ -69,6 +69,7 @@ class BotHandlersProvider(Provider):
             renderer=renderer,
             artifacts_dir=settings.artifacts_dir,
             tags=tags,
+            target_topic_id=settings.telegram.target_topic_id,
         )
 
 

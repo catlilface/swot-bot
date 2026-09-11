@@ -202,9 +202,11 @@ class ResultReporter:
         artifacts_dir: str,
         tags: TagGate,
         retry_delays: Sequence[float] = _DEFAULT_RETRY_DELAYS,
+        target_topic_id: int | None = None,
     ) -> None:
         self._bot = bot
         self._target = target_chat_id
+        self._topic = target_topic_id
         self._renderer = renderer
         self._artifacts = Path(artifacts_dir)
         self._tags = tags
@@ -250,9 +252,18 @@ class ResultReporter:
                 self._target,
                 "Не удалось доставить результат задачи "
                 f"{msg.task_id} — подробности в логах бота.",
+                **self._thread(),
             ),
             what="delivery-failed notice",
         )
+
+    def _thread(self) -> dict[str, Any]:
+        """Forum-topic routing: message_thread_id only when a topic is set.
+
+        Empty topic → sends land in the target chat's default (General)
+        topic, exactly as before the topic support was added.
+        """
+        return {"message_thread_id": self._topic} if self._topic is not None else {}
 
     def _resolve_artifact(self, path: str) -> Path | None:
         """Resolve a producer-provided path under the bot's artifacts dir.
@@ -301,7 +312,9 @@ class ResultReporter:
         for part in _chunk_text(text):
 
             async def send_part(text_part: str = part) -> None:
-                await self._bot.send_message(self._target, text_part, parse_mode="HTML")
+                await self._bot.send_message(
+                    self._target, text_part, parse_mode="HTML", **self._thread()
+                )
 
             await self._send(send_part, what="result message")
 
@@ -313,6 +326,7 @@ class ResultReporter:
                 lambda: self._bot.send_document(
                     self._target,
                     BufferedInputFile(srt.read_bytes(), filename="transcript.srt"),
+                    **self._thread(),
                 ),
                 what="srt document",
             )
@@ -397,6 +411,7 @@ class ResultReporter:
                     self._target,
                     f"Задача {msg.task_id} не завершилась успешно "
                     f"(стадия: {msg.stage}) — подробности в логах.",
+                    **self._thread(),
                 ),
                 what="failure notice",
             )
@@ -422,7 +437,9 @@ class ResultReporter:
                 "analyzing": "Анализирую…",
             }.get(msg.stage, msg.stage)
             await self._send(
-                lambda: self._bot.send_message(self._target, f"{label} ({msg.stage})"),
+                lambda: self._bot.send_message(
+                    self._target, f"{label} ({msg.stage})", **self._thread()
+                ),
                 what="progress message",
             )
         finally:

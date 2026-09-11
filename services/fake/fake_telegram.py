@@ -167,13 +167,19 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         return parts.get("document", b"")
 
     def _message(
-        self, chat_id: int, text: str | None = None, document: dict | None = None
+        self,
+        chat_id: int,
+        text: str | None = None,
+        document: dict | None = None,
+        thread_id: int | None = None,
     ) -> dict:
         message: dict = {
             "message_id": _next_msg_id(),
             "date": int(time.time()),
-            "chat": {"id": chat_id, "type": "private", "first_name": "Admin"},
+            "chat": {"id": chat_id, "type": "forum", "first_name": "Admin"},
         }
+        if thread_id is not None:
+            message["message_thread_id"] = thread_id
         if text is not None:
             message["text"] = text
         if document is not None:
@@ -223,6 +229,8 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         if method in ("sendMessage", "sendDocument"):
             form = self._form()
             chat_id = int(form.get("chat_id", ADMIN_ID))
+            thread_id = form.get("message_thread_id")
+            thread_id = int(thread_id) if thread_id else None
             text = form.get("text")
             document = None
             if method == "sendDocument":
@@ -235,14 +243,21 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
                     "mime_type": "application/x-subrip",
                 }
             print(
-                f"[fake-tg] {method} chat_id={chat_id} body={len(self._body)}b "
+                f"[fake-tg] {method} chat_id={chat_id} "
+                f"topic_id={thread_id} body={len(self._body)}b "
                 f"form_keys={sorted(form)} text={text!r} "
                 f"document={document and document.get('file_name')} "
                 f"file_size={document and document.get('file_size')}",
                 flush=True,
             )
             self._send_json(
-                200, {"ok": True, "result": self._message(chat_id, text, document)}
+                200,
+                {
+                    "ok": True,
+                    "result": self._message(
+                        chat_id, text, document, thread_id=thread_id
+                    ),
+                },
             )
             return
 

@@ -765,3 +765,148 @@ async def test_transcript_cleanup_refuses_paths_outside_artifacts(
     )
     assert len(bot.messages) == 1
     assert (alien / "segments.json").exists()
+
+
+# --- Форум-топик: TELEGRAM__TARGET_TOPIC_ID (message_thread_id) ------------
+
+
+class TopicRecordingBot:
+    """aiogram.Bot double: records kwargs (message_thread_id) of every send."""
+
+    def __init__(self) -> None:
+        self.message_calls: list[tuple[int, str, dict[str, Any]]] = []
+        self.document_calls: list[tuple[int, str, dict[str, Any]]] = []
+
+    async def send_message(self, chat_id: int, text: str, **kwargs: Any) -> str:
+        self.message_calls.append((chat_id, text, kwargs))
+        return text
+
+    async def send_document(self, chat_id: int, document: Any, **kwargs: Any) -> None:
+        self.document_calls.append((chat_id, document.filename, kwargs))
+
+
+async def test_result_delivered_to_configured_topic(tmp_path: Path) -> None:
+    """Топик задан: сообщение и SRT уходят в форум-топик — message_thread_id
+    в каждом исходящем Bot API вызове, chat_id при этом не меняется."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x51)
+    tdir = artifacts / str(task_id)
+    tdir.mkdir(parents=True)
+    (tdir / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    srt = tdir / "transcript.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:02,000\nТекст\n", encoding="utf-8")
+
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+        target_topic_id=143,
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-51",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(tdir),
+            summary_path=str(tdir / "summary.json"),
+            title="Лекция",
+            srt_path=str(srt),
+        )
+    )
+    # Результат: одно сообщение + SRT-документ, оба — в топик 143 того же чата.
+    assert len(bot.message_calls) == 1
+    chat_id, text, kwargs = bot.message_calls[0]
+    assert chat_id == 42
+    assert kwargs["message_thread_id"] == 143
+    assert kwargs["parse_mode"] == "HTML"  # исходная разметка не потерялась
+    assert len(bot.document_calls) == 1
+    doc_chat, doc_name, doc_kwargs = bot.document_calls[0]
+    assert doc_chat == 42
+    assert doc_name == "transcript.srt"
+    assert doc_kwargs == {"message_thread_id": 143}
+
+
+async def test_result_without_topic_omits_thread_id(tmp_path: Path) -> None:
+    """Топик не задан (пустой .env) → message_thread_id не передаётся:
+    поведение как до введения топиков (General/обычный чат)."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x52)
+    tdir = artifacts / str(task_id)
+    tdir.mkdir(parents=True)
+    (tdir / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-52",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(tdir),
+            summary_path=str(tdir / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.message_calls) == 1
+    assert "message_thread_id" not in bot.message_calls[0][2]
+    assert bot.document_calls == []
+
+
+async def test_failure_notice_goes_to_topic() -> None:
+    """Сообщение о провале задачи тоже уходит в настроенный топик."""
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir="/tmp",
+        tags=TagGate(),
+        retry_delays=(),
+        target_topic_id=777,
+    )
+    await reporter.on_failed(
+        JobFailed(
+            task_id=UUID(int=0x53),
+            trace_id="t-53",
+            stage="download",
+            error="boom",
+        )
+    )
+    assert len(bot.message_calls) == 1
+    assert bot.message_calls[0][0] == 42
+    assert bot.message_calls[0][2] == {"message_thread_id": 777}
+
+
+async def test_progress_messages_go_to_topic() -> None:
+    """Прогресс-сообщения («Скачиваю…» и т.д.) тоже доставляются в топик."""
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir="/tmp",
+        tags=TagGate(),
+        retry_delays=(),
+        target_topic_id=777,
+    )
+    await reporter.on_progress(
+        JobProgress(task_id=UUID(int=0x54), trace_id="t-54", stage="downloading")
+    )
+    assert len(bot.message_calls) == 1
+    assert bot.message_calls[0][2] == {"message_thread_id": 777}

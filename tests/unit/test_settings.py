@@ -47,6 +47,7 @@ _SWOT_ENV = [
     "TELEGRAM__TOKEN",
     "TELEGRAM__ADMIN_ID",
     "TELEGRAM__TARGET_CHAT_ID",
+    "TELEGRAM__TARGET_TOPIC_ID",
     "TELEGRAM__API_BASE_URL",
     "TRANSCRIBER__API_URL",
     "TRANSCRIBER__API_KEY",
@@ -84,6 +85,9 @@ def test_settings_empty_env_uses_defaults(clean_env: None) -> None:
     assert settings.transcriber.language == ""
     assert settings.transcriber.model == "whisper-1"
     assert settings.transcriber.api_url == "asr-service"
+    # telegram — цели доставки пустые (топик не задан)
+    assert settings.telegram.target_chat_id is None
+    assert settings.telegram.target_topic_id is None
 
 
 def test_noisy_env_does_not_leak_into_sections(
@@ -143,6 +147,44 @@ def test_scalar_fields_still_read_from_env(
 
     assert settings.media_dir == "/tmp/media-x"
     assert settings.health_port == 9000
+
+
+def test_telegram_target_topic_id_from_env(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TELEGRAM__TARGET_TOPIC_ID задаёт форум-топик (message_thread_id)."""
+    monkeypatch.setenv("TELEGRAM__TARGET_CHAT_ID", "42")
+    monkeypatch.setenv("TELEGRAM__TARGET_TOPIC_ID", "143")
+
+    settings = Settings()
+
+    assert settings.telegram.target_chat_id == 42
+    assert settings.telegram.target_topic_id == 143
+
+
+def test_telegram_empty_topic_string_is_none(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Пустая строка в .env (TELEGRAM__TARGET_TOPIC_ID=) — тот же дефолт, что и отсутствие."""
+    monkeypatch.setenv("TELEGRAM__TARGET_TOPIC_ID", "")
+
+    settings = Settings()
+
+    assert settings.telegram.target_topic_id is None
+
+
+def test_telegram_standalone_reads_topic_prefix(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Standalone TelegramSettings() читает TARGET_TOPIC_ID через свой префикс."""
+    from swot_contracts.config import TelegramSettings
+
+    monkeypatch.setenv("TELEGRAM__TARGET_TOPIC_ID", "777")
+
+    tg = TelegramSettings()
+
+    assert tg.target_topic_id == 777
+    assert tg.target_chat_id is None
 
 
 def test_broker_rabbit_url_percent_encodes_credentials(
