@@ -229,8 +229,8 @@ class FakeTelegramHandler(BaseHTTPRequestHandler):
         if method in ("sendMessage", "sendDocument"):
             form = self._form()
             chat_id = int(form.get("chat_id", ADMIN_ID))
-            thread_id = form.get("message_thread_id")
-            thread_id = int(thread_id) if thread_id else None
+            raw_thread_id = form.get("message_thread_id")
+            thread_id: int | None = int(raw_thread_id) if raw_thread_id else None
             text = form.get("text")
             document = None
             if method == "sendDocument":

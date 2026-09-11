@@ -78,3 +78,18 @@ docker compose -f docker-compose.dev.yml logs -f fake-tg   # ответы бот
   вообще (fallback на локальный промпт, T-0.4). Чтобы отключить трейсинг —
   зачистить `LANGFUSE__PUBLIC_KEY/SECRET_KEY`. **Postgres** ходит вместе с
   Langfuse; отдельно боту не нужен.
+
+## Локальные проверки (pre-commit)
+
+Перед коммитом те же проверки, что в CI: форматирование (`ruff format`),
+линт (`ruff check`), `mypy packages services`, unit-тесты (`pytest tests/unit`),
+импорт всех пакетов workspace.
+
+```bash
+uv sync                      # зависимости (включая pre-commit)
+uv run pre-commit install    # один раз — хуки на git commit
+uv run pre-commit run --all-files   # проверка всех файлов вручную
+```
+
+Конфиг: `.pre-commit-config.yaml`. Отключить на один раз: `git commit --no-verify`
+(не рекомендуется).
