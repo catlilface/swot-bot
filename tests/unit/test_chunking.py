@@ -199,7 +199,7 @@ def _prompt_text(inputs) -> str:
     if isinstance(inputs, dict):
         return str(inputs.get("input", ""))
     messages = getattr(inputs, "messages", None)
-    if messages is None and isinstance(inputs, (list, tuple)):
+    if messages is None and isinstance(inputs, list | tuple):
         messages = inputs
     if messages:
         return str(getattr(messages[0], "content", messages[0]))

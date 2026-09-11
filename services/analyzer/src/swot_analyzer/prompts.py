@@ -81,7 +81,7 @@ def _prompt_to_text(prompt_obj: Any) -> str | None:
     raw = getattr(prompt_obj, "prompt", None)
     if isinstance(raw, str):
         return raw
-    if isinstance(raw, (list, tuple)):
+    if isinstance(raw, list | tuple):
         return _messages_to_text(raw)
     return None
 

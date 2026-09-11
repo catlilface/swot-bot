@@ -29,9 +29,7 @@ class _LinkMessage:
 async def test_handle_link_non_url_text_replies_hint() -> None:
     message = _LinkMessage("привет")
     bus = FakeBus()
-    await handle_link(
-        message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate()
-    )
+    await handle_link(message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate())
     assert message.answers == ["Пришли ссылку на лекцию."]
     assert bus.published == []
 
@@ -40,9 +38,7 @@ async def test_handle_link_non_url_text_replies_hint() -> None:
 async def test_handle_link_empty_text_replies_hint() -> None:
     message = _LinkMessage(None)
     bus = FakeBus()
-    await handle_link(
-        message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate()
-    )
+    await handle_link(message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate())
     assert message.answers == ["Пришли ссылку на лекцию."]
     assert bus.published == []
 
@@ -52,9 +48,7 @@ async def test_handle_link_invalid_url_replies_error_without_publish() -> None:
     # http(s)-префикс есть (первая ветка пройдена), но URL слишком длинный.
     message = _LinkMessage("https://example.com/" + "a" * 3000)
     bus = FakeBus()
-    await handle_link(
-        message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate()
-    )
+    await handle_link(message, bus, InMemoryJobRegistry(), UrlValidator(), TagGate())
     assert message.answers == ["URL слишком длинный"]
     assert bus.published == []
 
@@ -80,7 +74,7 @@ async def test_link_accepted_asks_for_tag() -> None:
     message = _LinkMessage("https://example.com/lecture.mp4")
     await handle_link(message, bus, InMemoryJobRegistry(), UrlValidator(), tags)
     assert message.answers == [
-        "✅ Задача принята, обрабатываю…\n"
+        "Задача принята, обрабатываю…\n"
         "Теперь пришли тег с названием предмета "
         "(например: «Высшая Математика»)."
     ]
@@ -97,8 +91,7 @@ async def test_next_message_consumed_as_normalized_tag() -> None:
     tag_msg = _LinkMessage("  Высшая   Математика ")
     await handle_link(tag_msg, bus, InMemoryJobRegistry(), UrlValidator(), tags)
     assert tag_msg.answers == [
-        "Тег «высшая_математика» принят — "
-        "добавлю его в конец результата."
+        "Тег «высшая_математика» принят — добавлю его в конец результата."
     ]
     assert tags.tag_for(task_id) == "высшая_математика"
     assert len(bus.published) == 1  # тег не публикует новые ивенты
@@ -113,9 +106,7 @@ async def test_url_while_waiting_tag_reasks() -> None:
 
     tag_msg = _LinkMessage("https://example.com/another.mp4")
     await handle_link(tag_msg, bus, InMemoryJobRegistry(), UrlValidator(), tags)
-    assert tag_msg.answers == [
-        "Сначала пришли тег с названием предмета (не ссылку)."
-    ]
+    assert tag_msg.answers == ["Сначала пришли тег с названием предмета (не ссылку)."]
     assert tags.pop_next() == task_id  # всё ещё ждёт тег
     assert len(bus.published) == 1
 
@@ -128,9 +119,7 @@ async def test_blank_tag_reasks() -> None:
 
     tag_msg = _LinkMessage("   ")
     await handle_link(tag_msg, bus, InMemoryJobRegistry(), UrlValidator(), tags)
-    assert tag_msg.answers == [
-        "Тег не может быть пустым — пришли название предмета."
-    ]
+    assert tag_msg.answers == ["Тег не может быть пустым — пришли название предмета."]
     assert tags.pop_next() == task_id
 
 

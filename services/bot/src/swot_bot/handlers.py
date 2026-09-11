@@ -151,9 +151,7 @@ async def _accept_tag(
     """Попробовать обработать сообщение как тег предмета ожидающей задачи."""
     if user_text.startswith(("http://", "https://")):
         tags.await_tag(pending_id)
-        await message.answer(
-            "Сначала пришли тег с названием предмета (не ссылку)."
-        )
+        await message.answer("Сначала пришли тег с названием предмета (не ссылку).")
         return
     tag = normalize_tag(user_text)
     if not tag:
@@ -273,9 +271,7 @@ class ResultReporter:
         # Исходная ссылка админа — в конце результата (до строки с тегом);
         # экранируем под Telegram HTML-разметку (иначе & в URL ломает parse).
         if msg.source.url:
-            text = (
-                f"{text.rstrip()}\n\n🔗 {html.escape(msg.source.url, quote=False)}"
-            )
+            text = f"{text.rstrip()}\n\n🔗 {html.escape(msg.source.url, quote=False)}"
         tag = self._tags.tag_for(msg.task_id)
         if tag:
             # Тег предмета — в конце результата (собирается в handle_link).

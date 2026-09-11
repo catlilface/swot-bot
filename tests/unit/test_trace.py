@@ -505,4 +505,4 @@ async def test_handle_link_binds_context_before_publish(
 
     # Контекст не должен протекать за пределы обработчика апдейта.
     assert structlog.contextvars.get_contextvars().get("trace_id") is None
-    assert any("✅" in a for a in answers)
+    assert any("Задача принята" in a for a in answers)

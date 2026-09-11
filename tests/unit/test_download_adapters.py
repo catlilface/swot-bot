@@ -141,8 +141,7 @@ async def test_ytdlp_happy_path_audio_format(tmp_path: Path) -> None:
     # audio-first: чистый аудио пробуется первым; фолбэк на низкое видео
     # (<=480p) — для источников без аудио-трека (Yandex Disk отдаёт только video).
     assert all(
-        o["format"].startswith("bestaudio[acodec=none]/bestaudio/")
-        for o in seen_opts
+        o["format"].startswith("bestaudio[acodec=none]/bestaudio/") for o in seen_opts
     )
     assert media.title == "Lecture 1"
     assert media.duration_sec == 600

@@ -105,9 +105,9 @@ async def test_bot_progress_labels_and_fallback() -> None:
             JobProgress(task_id=task_id, trace_id="t-11", stage=stage)
         )
     assert [t for _, t in bot.sent] == [
-        "⬇️ Скачиваю… (downloading)",
-        "📝 Транскрибирую… (transcribing)",
-        "🧠 Анализирую… (analyzing)",
+        "Скачиваю… (downloading)",
+        "Транскрибирую… (transcribing)",
+        "Анализирую… (analyzing)",
         "weird_stage (weird_stage)",
     ]
     assert all(chat == 42 for chat, _ in bot.sent)
@@ -441,7 +441,7 @@ async def test_result_message_ends_with_normalized_tag(tmp_path: Path) -> None:
         )
     )
     assert len(bot.messages) == 1
-    assert bot.messages[0].endswith("\n\nвысшая_математика")
+    assert bot.messages[0].endswith("\n\n #высшая_математика")
     # После доставки состояние снято: тег не доработается к следующей задаче.
     assert tags.tag_for(task_id) is None
 
@@ -475,7 +475,8 @@ async def test_result_without_tag_has_no_tag_line(tmp_path: Path) -> None:
             srt_path="",
         )
     )
-    assert "" not in bot.messages[0]
+    # А тег не присылали → строка " #<тег>" в конце результата отсутствует.
+    assert not re.search(r"^ #[a-z0-9_]+$", bot.messages[0], re.M)
 
 
 async def test_failed_clears_tag_state() -> None:
@@ -495,8 +496,10 @@ async def test_failed_clears_tag_state() -> None:
     )
     await reporter.on_failed(
         JobFailed(
-            task_id=task_id, trace_id="t-33",
-            stage="download", error="boom",
+            task_id=task_id,
+            trace_id="t-33",
+            stage="download",
+            error="boom",
         )
     )
     assert tags.pop_next() is None
@@ -589,7 +592,9 @@ async def test_transcript_artifacts_removed_after_delivery(tmp_path: Path) -> No
     assert summary.exists()  # summary — артефакт аналитика, не транскрипции
 
 
-async def test_transcript_cleanup_refuses_paths_outside_artifacts(tmp_path: Path) -> None:
+async def test_transcript_cleanup_refuses_paths_outside_artifacts(
+    tmp_path: Path,
+) -> None:
     """segments.json вне корня artifacts не трогается (containment, P0-6);
     доставка при этом не ломается."""
     artifacts = tmp_path / "artifacts"

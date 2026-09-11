@@ -101,7 +101,7 @@ async def test_transcribe_writes_srt_and_segments(tmp_path: Path) -> None:
     # "json" — самый совместимый дефолт (OpenAI, OpenRouter, whisper-server);
     # сегментные таймкоды в SRT требуют "verbose_json" (не все эндпоинты).
     assert call["response_format"] == "json"
-    assert call["language"] is None
+    assert call["language"] == "ru"  # пустой конфиг -> дефолт "ru"
     filename, fileobj, mimetype = call["file"]
     assert filename == "audio.wav"
     assert mimetype == "audio/wav"
