@@ -1,8 +1,21 @@
 """JSON serialization for RabbitMQ messages (pydantic v2)."""
 
+import json
 from typing import Any
 
-from swot_contracts import BaseMessage, MessageType
+from swot_contracts import (
+    AnalysisFailed,
+    AnalysisReady,
+    BaseMessage,
+    DownloadFailed,
+    DownloadRequest,
+    JobFailed,
+    JobProgress,
+    MessageType,
+    TranscriptFailed,
+    TranscriptReady,
+    VideoDownloaded,
+)
 
 
 def serialize(message: BaseMessage) -> bytes:
@@ -22,18 +35,6 @@ def deserialize(body: bytes) -> BaseMessage:
 
 
 def _model_for(msg_type: MessageType) -> type[BaseMessage]:
-    from swot_contracts import (
-        AnalysisFailed,
-        AnalysisReady,
-        DownloadFailed,
-        DownloadRequest,
-        JobFailed,
-        JobProgress,
-        TranscriptFailed,
-        TranscriptReady,
-        VideoDownloaded,
-    )
-
     mapping: dict[MessageType, type[BaseMessage]] = {
         MessageType.DOWNLOAD_REQUEST: DownloadRequest,
         MessageType.VIDEO_DOWNLOADED: VideoDownloaded,
@@ -52,13 +53,9 @@ def _model_for(msg_type: MessageType) -> type[BaseMessage]:
 
 
 def _json_dumps(obj: dict[Any, Any]) -> str:
-    import json
-
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
 def _json_loads(text: str) -> dict[str, Any]:
-    import json
-
     result: dict[str, Any] = json.loads(text)
     return result

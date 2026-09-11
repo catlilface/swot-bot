@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from openai import AsyncOpenAI
+
 from .domain import Segmenter, TranscribeError, TranscriptResult
 from .ffmpeg import FfmpegSegmenter
 
@@ -42,8 +44,6 @@ class OpenaiAsrTranscriber:
         max_audio_mb: int = 512,
         timeout_sec: int = 300,
     ) -> None:
-        from openai import AsyncOpenAI
-
         self._client = client or AsyncOpenAI(
             base_url=base_url, api_key=api_key or "none"
         )

@@ -16,6 +16,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from .domain import SummarizeError, Summary
 from .prompts import REDUCE_PROMPT
 
+#: Values an LLM sampling parameter may take (JSON-safe scalars, e.g.
+#: ``{"temperature": 0.2, "max_tokens": 500}``).
+SamplingParameters = dict[str, Any]
+
 
 class LlmSummarizer:
     """Call an OpenAI-compatible chat model to produce a structured Summary.
@@ -30,7 +34,7 @@ class LlmSummarizer:
         base_url: str,
         api_key: str | None,
         model: str,
-        temperature: float = 0.3,
+        sampling_parameters: SamplingParameters | None = None,
         max_tokens: int = 4096,
         timeout_sec: int = 120,
         chunk_chars: int = 8000,
@@ -41,13 +45,17 @@ class LlmSummarizer:
         if llm is not None:
             self._model = llm
         else:
+            # T-2.9: ALL configured sampling parameters reach the model —
+            # not only temperature. The explicit max_tokens default can be
+            # overridden by sampling_parameters["max_tokens"].
+            params: dict[str, Any] = dict(sampling_parameters or {})
+            params.setdefault("max_tokens", max_tokens)
             self._model = ChatOpenAI(  # type: ignore[call-arg]  # stubs of langchain_openai lag the runtime API (max_tokens/request_timeout)
                 base_url=base_url,
                 api_key=api_key or "none",  # type: ignore[arg-type]  # runtime accepts str, stubs want SecretStr
                 model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
                 request_timeout=timeout_sec,
+                **params,
             )
         self._chunker = chunker or RecursiveCharacterTextSplitter(
             chunk_size=chunk_chars, chunk_overlap=0

@@ -5,6 +5,9 @@ Read from the environment via ``SECTION__FIELD`` vars with the ``__`` delimiter
 fall back to the defaults below.
 """
 
+from typing import Any
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,7 +31,10 @@ class LLMSettings(BaseSettings):
     api_url: str = "llm-service"  # docker-compose service name / base URL
     api_key: str | None = None
     model_id: str = "gpt-4o-mini"
-    sampling_parameters: dict = {}  # e.g. {"temperature": 0.2}
+    sampling_parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description='Extra LLM parameters, e.g. {"temperature": 0.2}',
+    )
     summarization_prompt_name: str = "lecture-summary"  # Langfuse prompt name
     max_tokens: int = 4096  # потолок длины ответа LLM за один вызов
     timeout_sec: int = 120  # таймаут одного вызова LLM-эндпоинта

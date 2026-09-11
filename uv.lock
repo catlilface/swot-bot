@@ -1894,21 +1894,14 @@ dependencies = [
     { name = "swot-observability" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "dishka", specifier = ">=1.10" },
     { name = "openai", specifier = ">=1.55" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "swot-bus", editable = "packages/bus" },
     { name = "swot-contracts", editable = "packages/contracts" },
     { name = "swot-observability", editable = "packages/observability" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "swot-workspace"

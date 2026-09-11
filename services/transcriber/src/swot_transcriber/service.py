@@ -6,9 +6,11 @@ from typing import TYPE_CHECKING
 
 from swot_contracts import (
     BaseMessage,
+    JobFailed,
     JobProgress,
     JobStatus,
     MessageBus,
+    TranscriptReady,
     VideoDownloaded,
     resolve_under,
 )
@@ -56,8 +58,6 @@ class TranscribeService:
             audio = await self._extractor.extract(media, work / "audio.wav")
             result = await self._transcriber.transcribe(audio, out_dir)
 
-            from swot_contracts import TranscriptReady
-
             await self._bus.publish(
                 TranscriptReady(
                     task_id=message.task_id,
@@ -87,8 +87,6 @@ class TranscribeService:
                 message.task_id,
                 message.trace_id,
             )
-            from swot_contracts import JobFailed
-
             await self._bus.publish(
                 JobFailed(
                     task_id=message.task_id,

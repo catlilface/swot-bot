@@ -366,3 +366,31 @@ def test_chatopenai_gets_max_tokens_and_timeout() -> None:
     model = summarizer.model
     assert model.max_tokens == 4096
     assert model.request_timeout == 120
+
+
+def test_sampling_parameters_reach_chatopenai() -> None:
+    """T-2.9: в ChatOpenAI попадают ВСЕ sampling-параметры, а не только
+    temperature: temperature и max_tokens из settings доходят до модели."""
+    summarizer = LlmSummarizer(
+        base_url="http://llm:8000/v1",
+        api_key="k",
+        model="gpt-4o-mini",
+        sampling_parameters={"temperature": 0.3, "max_tokens": 500},
+    )
+    model = summarizer.model
+    assert model.temperature == 0.3
+    assert model.max_tokens == 500
+
+
+def test_sampling_parameters_default_max_tokens() -> None:
+    """Без явного max_tokens в sampling-параметрах действует дефолт."""
+    summarizer = LlmSummarizer(
+        base_url="http://llm:8000/v1",
+        api_key="k",
+        model="gpt-4o-mini",
+        sampling_parameters={"temperature": 0.1},
+        max_tokens=4096,
+    )
+    model = summarizer.model
+    assert model.temperature == 0.1
+    assert model.max_tokens == 4096

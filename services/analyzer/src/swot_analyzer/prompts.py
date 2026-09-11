@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import langfuse
+
 LOCAL_PROMPT = """Ты — аналитик лекций. Ниже дан транскрипт лекции:
 
 {input}
@@ -92,8 +94,6 @@ class LangfusePromptProvider:
         fallback: LocalPromptProvider,
         fetch_timeout_seconds: float = 10.0,
     ) -> None:
-        import langfuse
-
         self._client = langfuse.Langfuse(
             public_key=public_key,
             secret_key=secret_key,

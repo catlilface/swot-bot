@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
+import aiohttp
+import yt_dlp
 from swot_contracts import SourceRef
 
 from .domain import DownloadedMedia, DownloadError
@@ -52,8 +54,6 @@ HeadProbe = Callable[[str], Awaitable[str | None]]
 
 async def _default_head_probe(url: str) -> str | None:
     """Best-effort HEAD probe: Content-Type header or None on any error."""
-    import aiohttp
-
     try:
         async with aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=5)
@@ -139,8 +139,6 @@ def _yt_dlp_run(
     opts: dict[str, Any], url: str, download: bool
 ) -> dict[str, Any] | None:
     """Synchronous yt-dlp call (runs in a worker thread, see YtDlpAdapter)."""
-    import yt_dlp
-
     with yt_dlp.YoutubeDL(opts) as ydl:
         result = ydl.extract_info(url, download=download)
         return cast("dict[str, Any] | None", result)
@@ -165,8 +163,6 @@ class DirectHttpAdapter:
         self._max_bytes = max_file_mb * 1024 * 1024
 
     async def download(self, source: SourceRef, dst_dir: Path) -> DownloadedMedia:
-        import aiohttp
-
         dst_dir.mkdir(parents=True, exist_ok=True)
         timeout = aiohttp.ClientTimeout(
             total=self._timeout,

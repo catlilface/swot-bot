@@ -466,10 +466,16 @@
   + применение всех параметров (не только temperature); единый стиль импортов
   (top-level); удалить неиспользуемый `logger` в `handlers.py`; согласовать
   dev-groups в pyproject'ах.
+  (Факт: неиспользуемого `logger` в `handlers.py` в актуальном коде нет —
+  находка уже снята рефакторингом; использован вариант `dict[str, Any]`,
+  т.к. stubs ChatOpenAI требуют `Mapping[str, Any]`; единый dev-групп =
+  корневой `[dependency-groups] dev`, stray `[project.optional-dependencies] dev`
+  в transcriber удалён; `serialization.py` — импорты перенесены на top-level.)
 - Приёмка:
-  - [ ] Тест: `sampling_parameters={"temperature": 0.3, "max_tokens": 500}` → оба
-        попадают в `ChatOpenAI`.
-  - [ ] `ruff check` без `F401` (unused logger); `uv run pytest tests/ -q` зелёные.
+  - [x] Тест: `sampling_parameters={"temperature": 0.3, "max_tokens": 500}` → оба
+        попадают в `ChatOpenAI` (`tests/unit/test_chunking.py::test_sampling_parameters_reach_chatopenai`).
+  - [x] `ruff check` без `F401` (unused logger); `uv run pytest tests/ -q` зелёные
+        (138 passed).
 
 **Критерий приёмки фазы 2:**
 - [ ] Нет мёртвого кода (по результатам T-2.2 … T-2.5).

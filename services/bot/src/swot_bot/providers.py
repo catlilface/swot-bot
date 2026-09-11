@@ -4,6 +4,8 @@ from collections.abc import AsyncIterable
 
 import aiogram
 from aiogram import Router
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from dishka import Provider, Scope, provide
 from swot_contracts import (
     AnalysisReady,
@@ -29,9 +31,6 @@ class BotHandlersProvider(Provider):
         if not base_url:
             return aiogram.Bot(token=token)
         # Dev stub / local proxy: point the client at a custom Bot API server.
-        from aiogram.client.session.aiohttp import AiohttpSession
-        from aiogram.client.telegram import TelegramAPIServer
-
         api = TelegramAPIServer(
             base=f"{base_url}/bot{{token}}/{{method}}",
             file=f"{base_url}/file/bot{{token}}/{{path}}",
