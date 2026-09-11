@@ -96,7 +96,8 @@ class RecordingBot:
 
 
 async def test_bot_progress_labels_and_fallback() -> None:
-    """T-1.6: known stages — label with emoji, unknown stage — the name itself (no crash)."""
+    """T-1.6: known stages — label with emoji, unknown stage — the name itself
+    (no crash). Progress goes to the admin, not to the target chat."""
     bot = RecordingBot()
     reporter = ResultReporter(
         bot=bot,
@@ -104,6 +105,7 @@ async def test_bot_progress_labels_and_fallback() -> None:
         renderer=MessageRenderer(),
         artifacts_dir="/tmp",
         tags=TagGate(),
+        admin_id=99,
     )
     task_id = UUID("00000000-0000-0000-0000-000000000011")
     for stage, _expected in (
@@ -121,7 +123,8 @@ async def test_bot_progress_labels_and_fallback() -> None:
         "Анализирую… (analyzing)",
         "weird_stage (weird_stage)",
     ]
-    assert all(chat == 42 for chat, _ in bot.sent)
+    # Progress доставлен именно админу, а не в целевой чат.
+    assert all(chat == 99 for chat, _ in bot.sent)
 
 
 def test_kind_for() -> None:
@@ -319,6 +322,7 @@ async def test_delivery_rate_limited_twice_then_delivered_no_nack(
         artifacts_dir=str(tmp_path),
         tags=TagGate(),
         retry_delays=(0.0, 0.0, 0.0),
+        admin_id=99,
     )
     bus = NackBus()
     await bus.consume(reporter.on_failed)
@@ -345,6 +349,7 @@ async def test_delivery_retries_exhausted_then_nack(tmp_path: Path) -> None:
         artifacts_dir=str(tmp_path),
         tags=TagGate(),
         retry_delays=(0.0, 0.0),
+        admin_id=99,
     )
     bus = NackBus()
     await bus.consume(reporter.on_failed)
@@ -373,6 +378,7 @@ async def test_missing_summary_gets_normalized_notice(tmp_path: Path) -> None:
         artifacts_dir=str(artifacts),
         tags=TagGate(),
         retry_delays=(),
+        admin_id=99,
     )
     task_id = UUID("00000000-0000-0000-0000-0000000000f3")
     await reporter.on_analysis(
@@ -385,6 +391,8 @@ async def test_missing_summary_gets_normalized_notice(tmp_path: Path) -> None:
         )
     )
     assert len(bot.sent) == 1
+    # Уведомление о недоставке уходит админу, а не в целевой чат.
+    assert bot.sent[0][0] == 99
     notice = bot.sent[0][1]
     assert "Не удалось доставить результат" in notice
     assert "Traceback" not in notice
@@ -629,6 +637,7 @@ async def test_failed_clears_tag_state() -> None:
         artifacts_dir="/tmp",
         tags=tags,
         retry_delays=(),
+        admin_id=99,
     )
     await reporter.on_failed(
         JobFailed(
@@ -868,8 +877,9 @@ async def test_result_without_topic_omits_thread_id(tmp_path: Path) -> None:
     assert bot.document_calls == []
 
 
-async def test_failure_notice_goes_to_topic() -> None:
-    """Сообщение о провале задачи тоже уходит в настроенный топик."""
+async def test_failure_notice_goes_to_admin() -> None:
+    """Уведомление о провале задачи уходит админу (а не в целевой чат);
+    message_thread_id не передаётся — топик принадлежит целевому чату."""
     bot = TopicRecordingBot()
     reporter = ResultReporter(
         bot=bot,  # type: ignore[arg-type]
@@ -878,6 +888,7 @@ async def test_failure_notice_goes_to_topic() -> None:
         artifacts_dir="/tmp",
         tags=TagGate(),
         retry_delays=(),
+        admin_id=99,
         target_topic_id=777,
     )
     await reporter.on_failed(
@@ -889,12 +900,13 @@ async def test_failure_notice_goes_to_topic() -> None:
         )
     )
     assert len(bot.message_calls) == 1
-    assert bot.message_calls[0][0] == 42
-    assert bot.message_calls[0][2] == {"message_thread_id": 777}
+    assert bot.message_calls[0][0] == 99
+    assert bot.message_calls[0][2] == {}
 
 
-async def test_progress_messages_go_to_topic() -> None:
-    """Прогресс-сообщения («Скачиваю…» и т.д.) тоже доставляются в топик."""
+async def test_progress_messages_go_to_admin() -> None:
+    """Прогресс-сообщения («Скачиваю…» и т.д.) идут админу, а не в целевой
+    чат: message_thread_id не передаётся (топик принадлежит целевому чату)."""
     bot = TopicRecordingBot()
     reporter = ResultReporter(
         bot=bot,  # type: ignore[arg-type]
@@ -903,10 +915,109 @@ async def test_progress_messages_go_to_topic() -> None:
         artifacts_dir="/tmp",
         tags=TagGate(),
         retry_delays=(),
+        admin_id=99,
         target_topic_id=777,
     )
     await reporter.on_progress(
         JobProgress(task_id=UUID(int=0x54), trace_id="t-54", stage="downloading")
     )
     assert len(bot.message_calls) == 1
-    assert bot.message_calls[0][2] == {"message_thread_id": 777}
+    assert bot.message_calls[0][0] == 99
+    assert bot.message_calls[0][2] == {}
+
+
+async def test_target_chat_gets_only_summary_and_srt(tmp_path: Path) -> None:
+    """Целевой чат: только саммари (сообщение) и SRT (документ). Прогресс
+    и провал уходят админу (admin_id), а не в target_chat_id."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x55)
+    tdir = artifacts / str(task_id)
+    tdir.mkdir(parents=True)
+    (tdir / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+    srt = tdir / "transcript.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:02,000\nТекст\n", encoding="utf-8")
+
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+        admin_id=99,
+    )
+    await reporter.on_progress(
+        JobProgress(task_id=task_id, trace_id="t-55", stage="downloading")
+    )
+    await reporter.on_failed(
+        JobFailed(task_id=task_id, trace_id="t-55", stage="download", error="x")
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-55",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(tdir),
+            summary_path=str(tdir / "summary.json"),
+            title="Лекция",
+            srt_path=str(srt),
+        )
+    )
+    admin_messages = [t for ch, t, _ in bot.message_calls if ch == 99]
+    target_messages = [t for ch, t, _ in bot.message_calls if ch == 42]
+    target_documents = [n for ch, n, _ in bot.document_calls if ch == 42]
+    assert admin_messages == [
+        "Скачиваю… (downloading)",
+        "Задача 00000000-0000-0000-0000-000000000055 не завершилась успешно "
+        "(стадия: download) — подробности в логах.",
+    ]
+    # В целевом чате — ровно одно сообщение (саммари) и SRT-документ.
+    assert len(target_messages) == 1
+    assert "Лекция" in target_messages[0]
+    assert target_documents == ["transcript.srt"]
+
+
+async def test_admin_not_configured_admin_messages_dropped(tmp_path: Path) -> None:
+    """Нет admin_id: прогресс и провал не отправляются никуда (детали в
+    логе, ack идёт), доставка результата в целевой чат не ломается."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x56)
+    tdir = artifacts / str(task_id)
+    tdir.mkdir(parents=True)
+    (tdir / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False), encoding="utf-8"
+    )
+
+    bot = TopicRecordingBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+        admin_id=None,
+    )
+    await reporter.on_progress(
+        JobProgress(task_id=task_id, trace_id="t-56", stage="downloading")
+    )
+    await reporter.on_failed(
+        JobFailed(task_id=task_id, trace_id="t-56", stage="download", error="x")
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-56",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(tdir),
+            summary_path=str(tdir / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    # В админ некому писать → только саммари уходит в целевой чат.
+    assert [ch for ch, _, _ in bot.message_calls] == [42]
+    assert bot.document_calls == []

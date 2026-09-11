@@ -184,6 +184,7 @@ def _make_reporter(artifacts: Path, bot: _FakeBot) -> ResultReporter:
         renderer=MessageRenderer(),
         artifacts_dir=str(artifacts),
         tags=TagGate(),
+        admin_id=99,  # delivery-failure notice goes to the admin
     )
 
 

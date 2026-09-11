@@ -186,7 +186,11 @@ def build_router(admin_id: int | None) -> tuple[Router, IsAdmin]:
 
 
 class ResultReporter:
-    """Consumes analysis.ready / job.failed and posts to the target chat.
+    """Consumes analysis.ready / job.failed / job.progress.
+
+    The target chat receives ONLY the finished summary (+ SRT document);
+    everything else — progress updates, failure and delivery-failure
+    notices — goes to the admin (``admin_id``).
 
     Transient Telegram errors (network / 429 / 5xx) are retried with backoff
     *before* the bus gets a chance to nack the message (T-1.7); once the
@@ -203,6 +207,7 @@ class ResultReporter:
         tags: TagGate,
         retry_delays: Sequence[float] = _DEFAULT_RETRY_DELAYS,
         target_topic_id: int | None = None,
+        admin_id: int | None = None,
     ) -> None:
         self._bot = bot
         self._target = target_chat_id
@@ -211,6 +216,7 @@ class ResultReporter:
         self._artifacts = Path(artifacts_dir)
         self._tags = tags
         self._retry_delays = tuple(retry_delays)
+        self._admin = admin_id
 
     async def _send(self, send: Callable[[], Awaitable[Any]], *, what: str) -> None:
         """Run a Telegram call, retrying transient errors with backoff.
@@ -246,13 +252,24 @@ class ResultReporter:
                 await asyncio.sleep(delay)
 
     async def _notify_delivery_failed(self, msg: AnalysisReady) -> None:
-        """One normalized, human-readable notice — never a traceback (T-1.7)."""
+        """One normalized, human-readable notice — never a traceback (T-1.7).
+
+        Goes to the admin: the target chat receives only summaries and SRT.
+        Without a configured admin the notice is dropped (the log keeps the
+        details) instead of nacking into an endless retry loop.
+        """
+        admin = self._admin
+        if admin is None:
+            logger.warning(
+                "admin not configured, delivery-failed notice dropped: task_id=%s",
+                msg.task_id,
+            )
+            return
         await self._send(
             lambda: self._bot.send_message(
-                self._target,
+                admin,
                 "Не удалось доставить результат задачи "
                 f"{msg.task_id} — подробности в логах бота.",
-                **self._thread(),
             ),
             what="delivery-failed notice",
         )
@@ -404,24 +421,33 @@ class ResultReporter:
             task_id=str(msg.task_id), trace_id=msg.trace_id, stage=msg.stage
         )
         try:
-            # Human-readable notice in the chat; the raw error string (often a
+            # Human-readable notice goes to the admin (the target chat gets
+            # only summaries and SRT); the raw error string (often a
             # technical detail) stays in the log only (T-1.7).
-            await self._send(
-                lambda: self._bot.send_message(
-                    self._target,
-                    f"Задача {msg.task_id} не завершилась успешно "
-                    f"(стадия: {msg.stage}) — подробности в логах.",
-                    **self._thread(),
-                ),
-                what="failure notice",
-            )
-            logger.info(
-                "failure delivered: task_id=%s trace_id=%s stage=%s error=%s",
-                msg.task_id,
-                msg.trace_id,
-                msg.stage,
-                msg.error,
-            )
+            admin = self._admin
+            if admin is None:
+                logger.warning(
+                    "admin not configured, failure notice dropped: task_id=%s stage=%s error=%s",
+                    msg.task_id,
+                    msg.stage,
+                    msg.error,
+                )
+            else:
+                await self._send(
+                    lambda: self._bot.send_message(
+                        admin,
+                        f"Задача {msg.task_id} не завершилась успешно "
+                        f"(стадия: {msg.stage}) — подробности в логах.",
+                    ),
+                    what="failure notice",
+                )
+                logger.info(
+                    "failure delivered: task_id=%s trace_id=%s stage=%s error=%s",
+                    msg.task_id,
+                    msg.trace_id,
+                    msg.stage,
+                    msg.error,
+                )
             self._tags.forget(msg.task_id)
         finally:
             structlog.contextvars.unbind_contextvars("task_id", "trace_id", "stage")
@@ -431,15 +457,23 @@ class ResultReporter:
             task_id=str(msg.task_id), trace_id=msg.trace_id, stage=msg.stage
         )
         try:
+            # Progress goes to the admin: the target chat receives only the
+            # finished summary and the SRT.
+            admin = self._admin
+            if admin is None:
+                logger.warning(
+                    "admin not configured, progress dropped: task_id=%s stage=%s",
+                    msg.task_id,
+                    msg.stage,
+                )
+                return
             label = {
                 "downloading": "Скачиваю…",
                 "transcribing": "Транскрибирую…",
                 "analyzing": "Анализирую…",
             }.get(msg.stage, msg.stage)
             await self._send(
-                lambda: self._bot.send_message(
-                    self._target, f"{label} ({msg.stage})", **self._thread()
-                ),
+                lambda: self._bot.send_message(admin, f"{label} ({msg.stage})"),
                 what="progress message",
             )
         finally:

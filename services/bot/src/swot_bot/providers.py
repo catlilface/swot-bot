@@ -70,6 +70,9 @@ class BotHandlersProvider(Provider):
             artifacts_dir=settings.artifacts_dir,
             tags=tags,
             target_topic_id=settings.telegram.target_topic_id,
+            # Progress / failure / delivery-failure notices go to the admin;
+            # the target chat gets only the summary and the SRT.
+            admin_id=settings.telegram.admin_id,
         )
 
 
