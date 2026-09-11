@@ -318,8 +318,9 @@ async def test_long_transcript_splits_into_multiple_map_calls() -> None:
     assert len(result.sections[0].facts) == 3000
 
 
-async def test_short_transcript_single_call() -> None:
-    """Короткий транскрипт -> один вызов (как раньше, без map-reduce)."""
+async def test_short_transcript_single_chunk_still_reduce() -> None:
+    """Короткий транскрипт (1 чанк) тоже проходит через REDUCE_PROMPT:
+    1 map + 1 reduce (reduce — всегда, независимо от числа чанков)."""
     llm = _FakeLLM()
     summarizer = LlmSummarizer(
         base_url="http://llm:8000/v1",
@@ -330,7 +331,8 @@ async def test_short_transcript_single_call() -> None:
         llm=llm,
     )
     result = await summarizer.summarize("ФАКТ: A\nФАКТ: B", "Ниже транскрипт: {input}")
-    assert len(llm.inputs) == 1
+    assert len(llm.inputs) == 2  # 1 map + 1 reduce
+    assert '"sections"' in llm.inputs[1]  # reduce получил JSON частичной выжимки
     assert isinstance(result, Summary)
     assert [f.text for f in result.sections[0].facts] == ["ФАКТ: A", "ФАКТ: B"]
 

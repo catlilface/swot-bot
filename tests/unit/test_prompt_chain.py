@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableLambda
 from swot_analyzer import summarizer as summarizer_mod
 from swot_analyzer.prompts import (
     LOCAL_PROMPT,
+    REDUCE_PROMPT,
     LangfusePromptProvider,
     LocalPromptProvider,
 )
@@ -18,11 +19,11 @@ class FakeChatModel:
     """Fake ChatOpenAI: with_structured_output → Runnable, записывающий вход."""
 
     def __init__(self) -> None:
-        self.seen_text: str | None = None
+        self.seen_texts: list[str] = []
 
     def with_structured_output(self, schema) -> RunnableLambda:
         async def fake_llm(prompt_value) -> dict:
-            self.seen_text = prompt_value.to_string()
+            self.seen_texts.append(prompt_value.to_string())
             return {
                 "summary": "Резюме лекции",
                 "sections": [
@@ -59,12 +60,16 @@ async def test_summarizer_prompt_contains_transcript_and_parses(
     # Response is parsed into Summary
     assert result.summary == "Резюме лекции"
     assert result.sections[0].facts[0].start_sec == 42.0
-    # The actual prompt the LLM receives
-    seen = fake.seen_text
-    assert seen is not None
-    assert TRANSCRIPT in seen  # the transcript is not silently discarded
-    assert '"sections"' in seen  # the JSON example is intact
-    assert "{{" not in seen
+    # map-вызов: транскрипт целиком в LOCAL_PROMPT
+    map_call = fake.seen_texts[0]
+    assert TRANSCRIPT in map_call  # the transcript is not silently discarded
+    assert '"sections"' in map_call  # the JSON example is intact
+    assert "{{" not in map_call
+    # reduce-вызов: REDUCE_PROMPT с JSON частичных выжимок (всегда, даже 1 чанк)
+    reduce_call = fake.seen_texts[1]
+    assert REDUCE_PROMPT.split("{input}")[0] in reduce_call
+    assert '"sections"' in reduce_call  # JSON частичной выжимки внутри
+    assert len(fake.seen_texts) == 2
 
 
 def test_langfuse_provider_fallback_on_unreachable_host() -> None:

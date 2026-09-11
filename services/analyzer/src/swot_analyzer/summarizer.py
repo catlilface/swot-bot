@@ -3,7 +3,10 @@
 Long transcripts are summarized with map-reduce: the transcript is split
 (`langchain-text-splitters`), each chunk is summarized separately (map), and
 the partial summaries are merged into one final ``Summary`` (reduce) so that
-the total input never exceeds the model's context window.
+the total input never exceeds the model's context window. The reduce pass
+(``REDUCE_PROMPT``) runs for **every** transcript — even a single short
+chunk goes through it — so the final answer is always shaped by
+``REDUCE_PROMPT`` (independent of Langfuse / the prompt provider).
 """
 
 import json
@@ -24,9 +27,12 @@ SamplingParameters = dict[str, Any]
 class LlmSummarizer:
     """Call an OpenAI-compatible chat model to produce a structured Summary.
 
-    A transcript longer than one ``chunk_chars`` chunk triggers map-reduce;
-    a transcript longer than ``max_transcript_chars`` is rejected up front
-    with a clear error instead of being sent to the LLM.
+    The transcript is always split into ``chunk_chars`` chunks (map), and the
+    partial summaries are always merged through ``REDUCE_PROMPT`` (reduce):
+    even a single-chunk transcript gets one map + one reduce call, so
+    ``REDUCE_PROMPT`` shapes the final answer in every case. A transcript
+    longer than ``max_transcript_chars`` is rejected up front with a clear
+    error instead of being sent to the LLM.
     """
 
     def __init__(
@@ -73,11 +79,11 @@ class LlmSummarizer:
         chunks = self._chunker.split_text(transcript)
         if not chunks:
             return Summary()
-        if len(chunks) == 1:
-            return await self._invoke(prompt, chunks[0])
         # map: per-chunk partial summaries (sequential: no endpoint hammering)
         partials = [await self._invoke(prompt, chunk) for chunk in chunks]
-        # reduce: merge partials into one Summary (dedupe facts)
+        # reduce: merge partials into one Summary (dedupe facts). Runs for
+        # every transcript (1 chunk included) so REDUCE_PROMPT is always in
+        # play — incl. slim stacks without Langfuse.
         combined = json.dumps([p.model_dump() for p in partials], ensure_ascii=False)
         return await self._invoke(REDUCE_PROMPT, combined)
 
