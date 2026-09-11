@@ -1,6 +1,6 @@
 [project]
 name = "swot-workspace"
-version = "0.0.0"
+version = "1.0.0"
 description = "swot-bot monorepo workspace root (uv)"
 requires-python = ">=3.13"
 
