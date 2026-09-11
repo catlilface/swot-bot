@@ -33,11 +33,16 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: swot_rabbitmq
+    # официальный образ не создаёт пользователей через env (в отличие от bitnami):
+    # пользователя из .env (BROKER__USER/BROKER__PASSWORD) создаёт init-скрипт
+    # (см. .docker/rabbitmq/rabbitmq-init-user.sh)
+    command: ["/usr/local/bin/rabbitmq-init-user.sh"]
     ports:
       - "5672:5672"    # AMQP
-      - "15672:15672"  # management UI (guest/guest)
+      - "15672:15672"  # management UI (swot/swot или guest/guest)
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./.docker/rabbitmq/rabbitmq-init-user.sh:/usr/local/bin/rabbitmq-init-user.sh:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
