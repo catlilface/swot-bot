@@ -3,7 +3,7 @@
 import asyncio
 import html
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -41,6 +41,21 @@ TG_MSG_LIMIT = 4096
 #: flood control (429) и 5xx.
 _RETRYABLE = (TelegramNetworkError, TelegramRetryAfter, TelegramServerError)
 _DEFAULT_RETRY_DELAYS = (1.0, 2.0, 4.0)
+
+#: Content hashtags recognized in the lecture summary. The LLM may put
+#: anything into summary.json "hashtags", so only these values (fixed
+#: order) reach the result message.
+_CONTENT_HASHTAGS = ("задания", "сессия")
+
+
+def _content_hashtags(hashtags: Iterable[str]) -> str:
+    """Recognized content hashtags for the result ("#задания #сессия").
+
+    Unknown values (LLM noise) are dropped; case/whitespace differences in
+    known values are tolerated.
+    """
+    normalized = {h.strip().lower() for h in hashtags}
+    return " ".join(f"#{tag}" for tag in _CONTENT_HASHTAGS if tag in normalized)
 
 
 def _chunk_text(text: str, limit: int = TG_MSG_LIMIT) -> list[str]:
@@ -273,9 +288,16 @@ class ResultReporter:
         if msg.source.url:
             text = f"{text.rstrip()}\n\n🔗 {html.escape(msg.source.url, quote=False)}"
         tag = self._tags.tag_for(msg.task_id)
+        suffixes = []
+        # Контент-хэштеги (#задания / #сессия) — по выжимке лекции, тег
+        # предмета — последней позицией (собирается в handle_link).
+        content = _content_hashtags(self._renderer.hashtags(summary))
+        if content:
+            suffixes.append(content)
         if tag:
-            # Тег предмета — в конце результата (собирается в handle_link).
-            text = f"{text.rstrip()}\n\n #{tag}"
+            suffixes.append(f"#{tag}")
+        if suffixes:
+            text = f"{text.rstrip()}\n\n{' '.join(suffixes)}"
         for part in _chunk_text(text):
 
             async def send_part(text_part: str = part) -> None:

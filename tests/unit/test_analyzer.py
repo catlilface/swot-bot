@@ -12,6 +12,17 @@ from swot_bus import InMemoryJobRegistry
 from swot_contracts import JobProgress, JobStatus, SourceRef, TranscriptReady
 
 
+def test_summary_hashtags_default_and_legacy_parsing() -> None:
+    """hashtags — новое поле: по умолчанию пустое; старый summary.json без него
+    (до релиза) всё ещё парсится."""
+    assert Summary().hashtags == []
+    legacy = {"title": "Т", "summary": "Р", "sections": []}
+    assert Summary.model_validate(legacy).hashtags == []
+    tagged = Summary(title="Т", summary="Р", hashtags=["задания", "сессия"])
+    roundtrip = Summary.model_validate(tagged.model_dump(mode="json"))
+    assert roundtrip.hashtags == ["задания", "сессия"]
+
+
 async def test_analyzer_writes_summary_and_publishes(tmp_path: Path) -> None:
     bus = FakeBus()
     registry = InMemoryJobRegistry()

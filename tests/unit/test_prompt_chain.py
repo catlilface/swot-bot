@@ -45,6 +45,10 @@ def test_local_prompt_renders_as_chat_template() -> None:
     # The JSON example is intact (braces unescaped after rendering)
     assert '"summary": "Краткое резюме лекции"' in rendered
     assert '"start_sec": 123' in rendered
+    # Новое поле "hashtags": есть в JSON-примере (LLM пишет его в выжимке)
+    assert '"hashtags"' in rendered
+    assert '"задания"' in rendered
+    assert '"сессия"' in rendered
     assert "{{" not in rendered
 
 
@@ -69,6 +73,8 @@ async def test_summarizer_prompt_contains_transcript_and_parses(
     reduce_call = fake.seen_texts[1]
     assert REDUCE_PROMPT.split("{input}")[0] in reduce_call
     assert '"sections"' in reduce_call  # JSON частичной выжимки внутри
+    # reduce собирает hashtags по всей лекции, не только по одному чанку
+    assert '"hashtags"' in reduce_call
     assert len(fake.seen_texts) == 2
 
 
@@ -88,3 +94,12 @@ def test_langfuse_provider_fallback_on_unreachable_host() -> None:
     assert isinstance(prompt, str)
     assert not isinstance(prompt, ChatPromptTemplate)
     assert prompt == LOCAL_PROMPT
+
+
+def test_reduce_prompt_asks_for_hashtags_only_known_values() -> None:
+    """REDUCE_PROMPT собирает hashtags по всей лекции и ограничивает их двумя
+    известными значениями."""
+    assert '"hashtags"' in REDUCE_PROMPT
+    assert "задания" in REDUCE_PROMPT
+    assert "сессия" in REDUCE_PROMPT
+    assert "Только эти два значения" in REDUCE_PROMPT

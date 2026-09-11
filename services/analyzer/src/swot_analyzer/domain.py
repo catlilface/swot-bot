@@ -25,6 +25,11 @@ class Summary(BaseModel):
     title: str = ""
     summary: str = ""
     sections: list[Section] = Field(default_factory=list)
+    #: Content hashtags detected in the lecture by the LLM:
+    #: "задания" — практические/домашние задания были упомянуты,
+    #: "сессия" — была информация о сессии/экзаменах.
+    #: Бот прогоняет список через whitelist перед публикацией.
+    hashtags: list[str] = Field(default_factory=list)
 
 
 class SummarizeError(Exception):

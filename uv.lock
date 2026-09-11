@@ -1905,7 +1905,7 @@ requires-dist = [
 
 [[package]]
 name = "swot-workspace"
-version = "1.0.0"
+version = "1.1.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

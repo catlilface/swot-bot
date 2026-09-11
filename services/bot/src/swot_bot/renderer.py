@@ -44,3 +44,11 @@ class MessageRenderer:
     def render(self, summary_path: Path) -> str:
         data = json.loads(summary_path.read_text(encoding="utf-8"))
         return self._template("result_message.html.j2").render(summary=data)
+
+    def hashtags(self, summary_path: Path) -> list[str]:
+        """Raw content hashtags from summary.json (whitelisted by the caller)."""
+        data = json.loads(summary_path.read_text(encoding="utf-8"))
+        raw = data.get("hashtags")
+        if not isinstance(raw, list):
+            return []
+        return [str(item) for item in raw]

@@ -10,7 +10,12 @@ from uuid import UUID
 import pytest
 from aiogram.exceptions import TelegramRetryAfter
 from aiogram.methods import GetMe
-from swot_bot.handlers import ResultReporter, _chunk_text, _kind_for
+from swot_bot.handlers import (
+    ResultReporter,
+    _chunk_text,
+    _content_hashtags,
+    _kind_for,
+)
 from swot_bot.renderer import MessageRenderer
 from swot_bot.tags import TagGate
 from swot_bot.validation import UrlValidator
@@ -28,6 +33,12 @@ def _make_summary() -> dict[str, Any]:
             }
         ],
     }
+
+
+def _make_summary_with_hashtags(hashtags: list[str]) -> dict[str, Any]:
+    data = _make_summary()
+    data["hashtags"] = hashtags
+    return data
 
 
 def test_url_validator_accepts_any_source() -> None:
@@ -441,7 +452,7 @@ async def test_result_message_ends_with_normalized_tag(tmp_path: Path) -> None:
         )
     )
     assert len(bot.messages) == 1
-    assert bot.messages[0].endswith("\n\n #высшая_математика")
+    assert bot.messages[0].endswith("\n\n#высшая_математика")
     # После доставки состояние снято: тег не доработается к следующей задаче.
     assert tags.tag_for(task_id) is None
 
@@ -477,6 +488,131 @@ async def test_result_without_tag_has_no_tag_line(tmp_path: Path) -> None:
     )
     # А тег не присылали → строка " #<тег>" в конце результата отсутствует.
     assert not re.search(r"^ #[a-z0-9_]+$", bot.messages[0], re.M)
+
+    # А тег не присылали → строка " #<тег>" в конце результата отсутствует.
+    assert not re.search(r"^ #[a-z0-9_]+$", bot.messages[0], re.M)
+
+
+# --- Контент-хэштеги: #задания / #сессия по выжимке лекции ------------------
+
+
+def test_content_hashtags_whitelist_order_and_noise() -> None:
+    """Whitelist: только известные значения, фиксированный порядок; шум LLM отбрасывается."""
+    assert _content_hashtags(["сессия", "задания", "прочее"]) == "#задания #сессия"
+    assert _content_hashtags(["Задания", " сессия "]) == "#задания #сессия"
+    assert _content_hashtags(["задания"]) == "#задания"
+    assert _content_hashtags([]) == ""
+    assert _content_hashtags(["меметология"]) == ""
+
+
+async def test_result_message_includes_content_hashtags(tmp_path: Path) -> None:
+    """Контент-хэштеги из summary.json досылаются в конце результата (до тега
+    предмета); неизвестные значения отбрасываются."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x41)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(
+            _make_summary_with_hashtags(["сессия", "задания", "меметология"]),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    bot = RecordingDocumentBot()
+    tags = TagGate()
+    tags.put_tag(task_id, "высшая_математика")
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=tags,
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-41",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    # Порядок фиксированный (#задания раньше #сессии), тег предмета — последним.
+    assert bot.messages[0].endswith("#задания #сессия #высшая_математика")
+    assert "меметология" not in bot.messages[0]
+
+
+async def test_result_message_hashtags_without_subject_tag(tmp_path: Path) -> None:
+    """Контент-хэштеги досылаются, даже если тег предмета так и не прислан."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x42)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary_with_hashtags(["задания"]), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),  # тег предмета не прислан
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-42",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    assert bot.messages[0].endswith("#задания")
+
+
+async def test_result_message_without_hashtags_has_no_hashtag_line(
+    tmp_path: Path,
+) -> None:
+    """Ни хэштегов в выжимке, ни тега предмета → хэштэг-строк нет вообще."""
+    artifacts = tmp_path / "artifacts"
+    task_id = UUID(int=0x43)
+    (artifacts / str(task_id)).mkdir(parents=True)
+    (artifacts / str(task_id) / "summary.json").write_text(
+        json.dumps(_make_summary(), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    bot = RecordingDocumentBot()
+    reporter = ResultReporter(
+        bot=bot,  # type: ignore[arg-type]
+        target_chat_id=42,
+        renderer=MessageRenderer(),
+        artifacts_dir=str(artifacts),
+        tags=TagGate(),
+        retry_delays=(),
+    )
+    await reporter.on_analysis(
+        AnalysisReady(
+            task_id=task_id,
+            trace_id="t-43",
+            source=SourceRef(url="https://example.com/v.mp4"),
+            base_dir=str(artifacts / str(task_id)),
+            summary_path=str(artifacts / str(task_id) / "summary.json"),
+            title="Лекция",
+            srt_path="",
+        )
+    )
+    assert len(bot.messages) == 1
+    assert "#задания" not in bot.messages[0]
+    assert "#сессия" not in bot.messages[0]
 
 
 async def test_failed_clears_tag_state() -> None:
