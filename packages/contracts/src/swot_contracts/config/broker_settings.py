@@ -5,6 +5,8 @@ Read from the environment via ``SECTION__FIELD`` vars with the ``__`` delimiter
 back to the defaults below.
 """
 
+from urllib.parse import quote
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,5 +33,11 @@ class BrokerSettings(BaseSettings):
 
     @property
     def rabbit_url(self) -> str:
-        """AMQP URL for broker clients (e.g. aio-pika)."""
-        return f"amqp://{self.user}:{self.password}@{self.host}:{self.port}/"
+        """AMQP URL for broker clients (e.g. aio-pika).
+
+        User/password are percent-encoded (T-2.8), so special characters in
+        credentials (``@``, ``/``, ``:``) don't break URL parsing.
+        """
+        user = quote(self.user, safe="")
+        password = quote(self.password, safe="")
+        return f"amqp://{user}:{password}@{self.host}:{self.port}/"

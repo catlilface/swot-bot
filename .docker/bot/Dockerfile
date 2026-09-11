@@ -1,23 +1,28 @@
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONUNBUFFERED=1
+# T-0.2: uv sync --frozen (uv.lock) вместо ручной установки зависимостей.
+# T-2.8: non-root USER; один uv sync без дублирования (без uv pip install).
+# python:3.13-alpine: итоговый образ (<200MB) меньше, чем uv bookworm-slim base (273MB) —
+# критерий T-2.8; у остальных сервисов база не менялась.
+FROM python:3.13-alpine
+
+ENV UV_COMPILE_BYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# uv ставится один раз (раньше два слоя: uv sync + uv pip install).
+RUN pip install --no-cache-dir uv
+
+# appuser (uid 10001, как в других сервисах). /app создаётся WORKDIR ниже (после USER),
+# поэтому слоя chown /app не нужно.
+RUN addgroup -g 10001 appuser \
+    && adduser -D -u 10001 -G appuser -h /home/appuser appuser \
+    && mkdir -p /data/media /data/artifacts && chown -R appuser:appuser /data
+USER appuser
 WORKDIR /app
 
-# Workspace manifests: only the shared packages + this service (see .dockerignore).
-COPY pyproject.toml uv.lock ./
-COPY packages/ packages/
-COPY services/bot/ services/bot/
+# Сначала lockfile (кэш слоя по uv.lock), затем исходники.
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser packages/ packages/
+COPY --chown=appuser:appuser services/bot/ services/bot/
+RUN uv sync --frozen --package swot-bot --no-dev
 
-# One sync: dependencies + workspace packages into /app/.venv (no system python).
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --package swot-bot --no-dev
-
-# `python` resolves to /app/.venv/bin/python.
 ENV PATH="/app/.venv/bin:$PATH"
-
-# Non-root runtime user; /data holds media + artifacts volumes.
-RUN mkdir -p /data/media /data/artifacts && \
-    useradd --create-home --uid 10001 appuser && \
-    chown -R appuser:appuser /app /data
-USER appuser
-
 CMD ["python", "-m", "swot_bot"]

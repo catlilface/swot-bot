@@ -80,13 +80,15 @@ compose-контейнерами, которые оператор осознан
 
 ### Optional services
 
-- **Langfuse** — не входит в dev-compose сознательно: v3 требует Postgres +
-  ClickHouse + Redis + MinIO, а с пустыми `LANGFUSE__PUBLIC_KEY/SECRET_KEY`
-  аналитик работает на локальном промпте (fallback, добавлен в T-0.4).
-  Если нужны промпт-менеджмент/трейсинг: поднять официальный
-  langfuse docker-compose (v3) и заполнить ключи в `.env` — бинарник
-  `analyzer` менять не нужно (конфиг уже читает `LANGFUSE__*`).
-- **Postgres** — вместе с Langfuse; отдельно боту не нужен.
+- **Langfuse** (v3) — теперь входит в default dev-стек (T-2.8): `langfuse`
+  (UI — http://localhost:3000) + `langfuse-worker` + Postgres, ClickHouse,
+  Redis, MinIO. При первом старте проект/пользователь создаются автоматически
+  (`LANGFUSE_INIT_*`, dev-ключи — в `docker-compose.yml`; те же ключи задаёт
+  compose сервису `analyzer`, так что трейсинг включён по умолчанию в стеке).
+  Чтобы отключить трейсинг — зачистить `LANGFUSE__PUBLIC_KEY/SECRET_KEY`
+  (override в `environment` analyzer'а): с пустыми ключами сервис падает на
+  локальный промпт (fallback, T-0.4).
+- **Postgres** — ходит вместе с Langfuse; отдельно боту не нужен.
 
 ## Документация
 

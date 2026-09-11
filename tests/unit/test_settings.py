@@ -143,3 +143,30 @@ def test_scalar_fields_still_read_from_env(
 
     assert settings.media_dir == "/tmp/media-x"
     assert settings.health_port == 9000
+
+
+def test_broker_rabbit_url_percent_encodes_credentials(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-2.8: спецсимволы в user/password URL-экодируются в rabbit_url."""
+    monkeypatch.setenv("BROKER__USER", "u@ser:1")
+    monkeypatch.setenv("BROKER__PASSWORD", "p@ss/w ord")
+
+    broker = BrokerSettings()
+
+    url = broker.rabbit_url
+    assert "u%40ser%3A1" in url
+    assert "p%40ss%2Fw%20ord" in url
+    assert "@rabbitmq:5672/" in url
+
+
+def test_broker_rabbit_url_plain_credentials_unchanged(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Обычные креды без спецсимволов не меняются."""
+    monkeypatch.setenv("BROKER__USER", "swot")
+    monkeypatch.setenv("BROKER__PASSWORD", "swot")
+
+    broker = BrokerSettings()
+
+    assert broker.rabbit_url == "amqp://swot:swot@rabbitmq:5672/"

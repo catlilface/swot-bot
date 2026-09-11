@@ -449,11 +449,13 @@
 - Работа: non-root `USER` в образах; один `uv sync` (без дубля); healthcheck у
   langfuse; `rabbit_url` — URL-энкодинг user/password.
 - Приёмка:
-  - [ ] `docker run --rm swot-bot-bot id` — не root; `du -sh` образа меньше базового
+  - [x] `docker run --rm swot-bot-bot id` — не root; `du -sh` образа меньше базового
         (одна стадия sync).
-  - [ ] Тест: `BROKER__PASSWORD='p@ss/w ord'` → `rabbit_url` содержит
+        (uid=10001(appuser); образ 219MB — python:3.13-alpine + один `uv sync`,
+        меньше 287MB предшествующего двухстадийного образа и 273MB uv-base)
+  - [x] Тест: `BROKER__PASSWORD='p@ss/w ord'` → `rabbit_url` содержит
         `p%40ss%2Fw%20ord`.
-  - [ ] `docker compose up` — langfuse-healthcheck проходит, analyzer ждёт его.
+  - [x] `docker compose up` — langfuse-healthcheck проходит, analyzer ждёт его.
 
 ### T-2.9 Мелочи
 - Находки: P2-16 … P2-18. Зависимости: нет.
