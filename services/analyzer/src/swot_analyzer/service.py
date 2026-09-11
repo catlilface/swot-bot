@@ -1,4 +1,4 @@
-"""Analyzer application service: transcript.ready -> summary.json -> analysis.ready."""
+"""Analyzer application service"""
 
 from __future__ import annotations
 
@@ -52,15 +52,11 @@ class AnalyzeService:
             )
         )
         try:
-            # Path containment: upstream-supplied paths must stay inside the
-            # analyzer's own artifacts dir (P0-6).
             base_dir = resolve_under(self._artifacts_dir, message.base_dir)
             srt_path = resolve_under(base_dir, message.srt_path)
             transcript = self._read_transcript(srt_path)
             prompt = self._prompt_provider.get(self._prompt_name)
             summary = await self._summarizer.summarize(transcript, prompt)
-            # T-2.4: заголовок — метаданные видео (не результат LLM),
-            # переносим из transcript.ready в summary.json и analysis.ready.
             summary.title = message.title
 
             summary_path = base_dir / "summary.json"

@@ -1,4 +1,4 @@
-"""Entry point for the analyzer service (wires DI via dishka)."""
+"""Entry point for the analyzer service."""
 
 import asyncio
 
@@ -32,8 +32,6 @@ async def _amain() -> None:
             health = await request_container.get(HealthServer)
             await health.start()
             service = await request_container.get(AnalyzeService)
-            # T-1.6: SIGTERM/SIGINT → stop consuming (drain in-flight in
-            # bus.close below) → close bus → stop health server → exit 0.
             await run_until_shutdown(service.run())
     finally:
         await container.close()

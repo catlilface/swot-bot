@@ -98,7 +98,9 @@ async def test_transcribe_writes_srt_and_segments(tmp_path: Path) -> None:
     assert len(calls) == 1
     call = calls[0]
     assert call["model"] == "whisper-1"
-    assert call["response_format"] == "verbose_json"
+    # "json" — самый совместимый дефолт (OpenAI, OpenRouter, whisper-server);
+    # сегментные таймкоды в SRT требуют "verbose_json" (не все эндпоинты).
+    assert call["response_format"] == "json"
     assert call["language"] is None
     filename, fileobj, mimetype = call["file"]
     assert filename == "audio.wav"
@@ -157,3 +159,37 @@ async def test_transcribe_without_segments_falls_back_to_text(
     # единый титр на всю длительность
     assert "00:00:00,000 --> 00:00:07,250" in srt
     assert tr.language == "ru"
+
+
+async def test_transcribe_response_format_configurable(tmp_path: Path) -> None:
+    stub = _Client(_Result("Текст", "ru", 5.0, None))
+    verbose = OpenaiAsrTranscriber(
+        base_url="http://asr:8000/v1",
+        api_key="k",
+        model="whisper-1",
+        language="",
+        client=stub,
+        segmenter=_FakeSegmenter(),
+        response_format="verbose_json",
+    )
+    audio = tmp_path / "a.wav"
+    audio.write_bytes(b"pcm")
+
+    await verbose.transcribe(audio, tmp_path / "out")
+    call = stub.audio.transcriptions.calls[0]
+    assert call["response_format"] == "verbose_json"
+
+
+async def test_transcribe_json_response_without_duration_falls_back_to_chunk_length(
+    tmp_path: Path,
+) -> None:
+    # response_format=json: segments/duration нет -> единый титр до номинальной
+    # длины чанка (600s), а не нулевой.
+    result = _Result("Текст чанка.", "ru", 0.0, None)
+    transcriber, _, audio = _make(result, tmp_path)
+
+    tr = await transcriber.transcribe(audio, tmp_path / "out")
+
+    srt = tr.srt_path.read_text(encoding="utf-8")
+    assert "Текст чанка." in srt
+    assert "00:00:00,000 --> 00:10:00,000" in srt

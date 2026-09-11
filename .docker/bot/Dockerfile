@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir uv
 # поэтому слоя chown /app не нужно.
 RUN addgroup -g 10001 appuser \
     && adduser -D -u 10001 -G appuser -h /home/appuser appuser \
-    && mkdir -p /data/media /data/artifacts && chown -R appuser:appuser /data
+    && mkdir -p /data /artifacts && chown -R appuser:appuser /data /artifacts
 USER appuser
 WORKDIR /app
 

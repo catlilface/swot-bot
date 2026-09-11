@@ -1,0 +1,332 @@
+# swot-bot dev stack — full test mode (CI default).
+#
+# Everything self-contained: no real Telegram / ASR / LLM keys needed.
+#   - Telegram  -> fake-tg (Bot API stub on :8081, /inject for E2E)
+#   - ASR       -> asr-service (fake OpenAI-compatible, returns pre-baked segments)
+#   - LLM       -> llm-service (fake OpenAI-compatible, canned SWOT answers)
+#   - Langfuse  -> v3 self-hosted tracing, wired via LANGFUSE__* (OBS__ENABLED=true)
+#
+# The fake wiring is PINNED below in the services' `environment`, so this
+# stack works even if .env contains real production values (compose
+# `environment` wins over `env_file`).
+#
+# Usage:
+#   cp .env.example .env          # fakes already configured by default
+#   docker compose -f docker-compose.dev.yml up -d --build
+#   curl -fsS -X POST http://localhost:8081/inject -H 'Content-Type: application/json' \
+#        -d '{"text": "http://fake-tg:8081/media/sample.wav"}'
+#
+# Sibling stacks (production-like):
+#   docker-compose.slim.yml — 4 services + rabbitmq only; Telegram/ASR/LLM are external (.env)
+#   docker-compose.full.yml — slim + self-hosted whisper-server (ASR) and ollama (LLM)
+
+name: swot-bot
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: swot_rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI (guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [swot]
+
+  # Langfuse v3 (self-hosted): postgres + clickhouse + minio + langfuse.
+  # The analyzer writes traces there via LANGFUSE__* (see .env.example).
+  langfuse-postgres:
+    image: postgres:16
+    container_name: langfuse_postgres
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [swot]
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: langfuse_clickhouse
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DEFAULT_DATABASE: langfuse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "clickhouse client --user clickhouse --password clickhouse --query 'SELECT 1' --quiet"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [swot]
+
+  langfuse-minio:
+    image: minio/minio:latest
+    container_name: langfuse_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: langfuse
+      MINIO_ROOT_PASSWORD: langfuse123
+    ports:
+      - "9090:9000"    # S3 API (Langfuse S3 endpoint uses host:9090, see .env.example)
+      - "9091:9001"    # MinIO console
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready-status local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [swot]
+
+  langfuse:
+    image: docker.io/langfuse/langfuse:3
+    container_name: langfuse
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    environment:
+      SALT: "dev-salt"
+      DATABASE_URL: "postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse"
+      CLICKHOUSE_URL: "http://langfuse-clickhouse:8123"
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_MIGRATION_URL: "clickhouse://langfuse-clickhouse:9440"
+      S3_EVENT_UPLOAD_BUCKET: "events"
+      S3_EVENT_UPLOAD_ACCESS_KEY_ID: langfuse
+      S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: langfuse123
+      S3_EVENT_UPLOAD_ENDPOINT: "http://langfuse-minio:9090"
+      S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      S3_MEDIA_UPLOAD_BUCKET: "media"
+      S3_MEDIA_UPLOAD_ACCESS_KEY_ID: langfuse
+      S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: langfuse123
+      S3_MEDIA_UPLOAD_ENDPOINT: "http://host.docker.internal:9090"
+      S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      TELEMETRY_ENABLED: "false"
+    # The bucket 'langfuse' is pre-created by the directory before startup.
+    command: >
+      mkdir -p /langfuse-data/.minio.sys/buckets/langfuse &&
+      exec docker entrypoint.sh
+    volumes:
+      - langfuse_data:/langfuse-data
+    ports:
+      - "3000:3000"  # Langfuse Web UI: http://localhost:3000
+    networks: [swot]
+
+  asr-service:
+    build:
+      context: .
+      dockerfile: .docker/fake/Dockerfile
+    container_name: swot_fake_asr
+    env_file:
+      - .env
+    command: asr
+    ports:
+      - "8082:8000"  # for host-side debugging (curl http://localhost:8082/healthz)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [swot]
+
+  llm-service:
+    build:
+      context: .
+      dockerfile: .docker/fake/Dockerfile
+    container_name: swot_fake_llm
+    env_file:
+      - .env
+    command: llm
+    # dev: fake LLM (same as asr-service above).
+    ports:
+      - "8083:8000"  # for host-side debugging (curl http://localhost:8083/healthz)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [swot]
+
+  fake-tg:
+    build:
+      context: .
+      dockerfile: .docker/fake/Dockerfile
+    container_name: swot_fake_tg
+    env_file:
+      - .env
+    command: tg
+    # No settings needed — it is the Bot API stub; the bot talks to it via
+    # TELEGRAM__API_BASE_URL (pinned in the `bot` service below).
+    ports:
+      - "8081:8081"  # /inject for E2E runs (see README)
+    volumes:
+      - swot_media:/data  # pre-baked sample.wav lives here (shared with downloader)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [swot]
+
+  bot:
+    build:
+      context: .
+      dockerfile: .docker/bot/Dockerfile
+    image: swot-bot/bot:dev
+    container_name: swot_bot
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+      fake-tg:
+        condition: service_started
+    env_file:
+      - .env
+    # dev: real Telegram — never (same as fake-tg above).
+    environment:
+      TELEGRAM__TOKEN: "123456:AAFakeDevTokenForSwotBot"
+      TELEGRAM__ADMIN_ID: "12345678"
+      TELEGRAM__TARGET_CHAT_ID: "12345678"
+      TELEGRAM__API_BASE_URL: "http://fake-tg:8081"
+    # Reads summary.json + transcript.srt from the shared artifacts volume
+    # to deliver the final result to Telegram.
+    volumes:
+      - swot_artifacts:/artifacts
+    command: ["python", "-m", "swot_bot"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  downloader:
+    build:
+      context: .
+      dockerfile: .docker/downloader/Dockerfile
+    image: swot-bot/downloader:dev
+    container_name: swot_downloader
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+    env_file:
+      - .env
+    command: ["python", "-m", "swot_downloader"]
+    volumes:
+      - swot_media:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  transcriber:
+    build:
+      context: .
+      dockerfile: .docker/transcriber/Dockerfile
+    image: swot-bot/transcriber:dev
+    container_name: swot_transcriber
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+      asr-service:
+        condition: service_started
+    env_file:
+      - .env
+    # dev: fake ASR (asr-service above) — no real API key needed.
+    environment:
+      TRANSCRIBER__API_URL: "http://asr-service:8000/v1"
+      TRANSCRIBER__API_KEY: "none"
+      TRANSCRIBER__MODEL: "fake-asr"
+    command: ["python", "-m", "swot_transcriber"]
+    volumes:
+      - swot_media:/data
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: .docker/analyzer/Dockerfile
+    image: swot-bot/analyzer:dev
+    container_name: swot_analyzer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+      llm-service:
+        condition: service_started
+    env_file:
+      - .env
+    # dev: fake LLM (llm-service above) — no real API key needed.
+    environment:
+      LLM__API_URL: "http://llm-service:8000/v1"
+      LLM__API_KEY: "none"
+      LLM__MODEL_ID: "fake-chat"
+    command: ["python", "-m", "swot_analyzer"]
+    volumes:
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+  swot_media:
+  swot_artifacts:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_minio_data:
+  langfuse_data:
+
+networks:
+  swot:
+    driver: bridge

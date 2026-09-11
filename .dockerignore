@@ -27,5 +27,5 @@ wheels/
 
 # Docker itself
 .docker
-docker-compose.yml
+docker-compose*.yml
 .env.example

@@ -5,6 +5,6 @@
 {% for section in summary.sections %}
 <b>{{ section.heading }}</b>
 {% for fact in section.facts %}
-<span class="-chrono">{{ fact.start_sec | chrono }}</span> {{ fact.text }}
+<code>{{ fact.start_sec | chrono }}</code> {{ fact.text }}
 {% endfor %}
 {% endfor %}

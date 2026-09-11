@@ -14,10 +14,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # `python` resolves to /app/.venv/bin/python.
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Non-root runtime user; /data holds media + artifacts volumes.
-RUN mkdir -p /data/media /data/artifacts && \
+# Non-root runtime user; /data holds the media volume, /artifacts the artifacts volume.
+RUN mkdir -p /data /artifacts && \
     useradd --create-home --uid 10001 appuser && \
-    chown -R appuser:appuser /app /data
+    chown -R appuser:appuser /app /data /artifacts
 USER appuser
 
 CMD ["python", "-m", "swot_analyzer"]

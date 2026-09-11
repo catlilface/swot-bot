@@ -13,7 +13,7 @@ __all__ = ["resolve_under"]
 
 
 def resolve_under(base: str | Path, candidate: str | Path) -> Path:
-    """Resolve *candidate* and ensure the result stays inside *base*.
+    """Resolve candidate and ensure the result stays inside base.
 
     *candidate* may be absolute or relative; relative paths are anchored to
     *base*.  Escapes are rejected and reported as :class:`ValueError`:
@@ -40,7 +40,7 @@ def resolve_under(base: str | Path, candidate: str | Path) -> Path:
 
 
 def _is_within(base: Path, candidate: Path) -> bool:
-    """True if *candidate* equals *base* or is located below it.
+    """True if candidate equals *base* or is located below it.
 
     Walks ``candidate.parents`` instead of ``Path.ancestors`` because the
     latter is not available in every Python build we run on.

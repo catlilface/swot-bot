@@ -1,4 +1,4 @@
-"""Shared message contracts (Pydantic v2) and settings for swot-bot services."""
+"""Shared message contracts and settings for swot-bot services."""
 
 from .config import (
     BrokerSettings,

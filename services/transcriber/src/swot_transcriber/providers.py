@@ -30,6 +30,7 @@ class TranscriberAdaptersProvider(Provider):
             api_key=settings.transcriber.api_key,
             model=settings.transcriber.model,
             language=settings.transcriber.language,
+            response_format=settings.transcriber.response_format,
             segmenter=segmenter,
             segment_duration_sec=settings.transcriber.segment_duration_sec,
             max_audio_mb=settings.transcriber.max_audio_mb,

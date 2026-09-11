@@ -67,10 +67,14 @@ jobs:
 
   compose-integration:
     runs-on: ubuntu-latest
+    # The dev stack (fakes as Telegram/ASR/LLM + Langfuse) is the CI stack;
+    # all `docker compose` calls below pick it up from this variable.
+    env:
+      COMPOSE_FILE: docker-compose.dev.yml
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start stack (real compose file, dev fakes as ASR/LLM/Telegram)
+      - name: Start stack (dev compose file: fakes as Telegram/ASR/LLM)
         run: |
           cp .env.example .env
           docker compose up -d --build

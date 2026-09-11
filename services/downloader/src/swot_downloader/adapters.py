@@ -4,12 +4,6 @@ Routing: ``SourceRouter.route()`` returns the adapter to use for a URL:
 platform hosts (yt-dlp knows their extractors) → ``YtDlpAdapter``; direct
 media URLs (media extension, or ``Content-Type: video/*|audio/*`` per HEAD)
 → ``DirectHttpAdapter``; anything else → ``YtDlpAdapter`` (default).
-
-Hardening (P1-3, P1-4): yt-dlp's blocking work runs in a worker thread
-under an overall deadline (the event loop must never freeze), and video
-duration is checked from metadata extraction **before** downloading;
-direct HTTP validates that the response really is media (content-type)
-and enforces a hard file-size limit with partial-file cleanup.
 """
 
 from __future__ import annotations

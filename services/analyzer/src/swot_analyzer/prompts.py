@@ -80,7 +80,7 @@ def _prompt_to_text(prompt_obj: Any) -> str | None:
 
 
 class LangfusePromptProvider:
-    """Fetch the prompt from self-hosted Langfuse (label=production).
+    """Fetch the prompt from Langfuse (label=production).
 
     ``get()`` гарантированно возвращает ``str``: недоступный host или
     отсутствующий промпт → fallback (``LocalPromptProvider``).

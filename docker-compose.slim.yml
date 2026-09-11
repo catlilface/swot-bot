@@ -1,0 +1,146 @@
+# swot-bot slim stack — minimal production deployment.
+#
+# Four pipeline services + RabbitMQ. Nothing else.
+#
+# All external dependencies come from .env (no fakes, no in-stack Langfuse):
+#   TELEGRAM__TOKEN              real bot token from @BotFather
+#   TELEGRAM__API_BASE_URL       empty = https://api.telegram.org
+#                                (or a self-hosted Bot API / proxy)
+#   TRANSCRIBER__API_URL         external OpenAI-compatible ASR endpoint
+#   TRANSCRIBER__API_KEY
+#   TRANSCRIBER__MODEL           ASR model id
+#   LLM__API_URL                 external OpenAI-compatible LLM endpoint
+#   LLM__API_KEY
+#   LLM__MODEL_ID                LLM model id
+#   LANGFUSE__HOST / __PUBLIC_KEY / __SECRET_KEY
+#                                empty = tracing disabled, analyzer falls back
+#                                to the local prompts.yaml (T-0.4)
+#
+# Usage:
+#   cp .env.example .env          # then fill in the real values
+#   docker compose -f docker-compose.slim.yml up -d --build
+#
+# If you would rather self-host ASR and/or LLM instead of using external
+# APIs, use docker-compose.full.yml (same services + whisper-server + ollama).
+
+name: swot-bot
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: swot_rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI (guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [swot]
+
+  bot:
+    build:
+      context: .
+      dockerfile: .docker/bot/Dockerfile
+    image: swot-bot/bot:dev
+    container_name: swot_bot
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    # Reads summary.json + transcript.srt from the shared artifacts volume
+    # to deliver the final result to Telegram.
+    volumes:
+      - swot_artifacts:/artifacts
+    command: ["python", "-m", "swot_bot"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  downloader:
+    build:
+      context: .
+      dockerfile: .docker/downloader/Dockerfile
+    image: swot-bot/downloader:dev
+    container_name: swot_downloader
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: ["python", "-m", "swot_downloader"]
+    volumes:
+      - swot_media:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  transcriber:
+    build:
+      context: .
+      dockerfile: .docker/transcriber/Dockerfile
+    image: swot-bot/transcriber:dev
+    container_name: swot_transcriber
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: ["python", "-m", "swot_transcriber"]
+    volumes:
+      - swot_media:/data
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: .docker/analyzer/Dockerfile
+    image: swot-bot/analyzer:dev
+    container_name: swot_analyzer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: ["python", "-m", "swot_analyzer"]
+    volumes:
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+  swot_media:
+  swot_artifacts:
+
+networks:
+  swot:
+    driver: bridge

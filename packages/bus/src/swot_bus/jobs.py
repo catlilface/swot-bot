@@ -14,11 +14,11 @@ class InMemoryJobRegistry:
     """Thread/async-safe per-process job tracker.
 
     A dict keyed by task_id → status. Persists only for the process lifetime;
-    sufficient for one admin + one target chat (see docs/architecture.md).
+    sufficient for one admin + one target chat.
 
     Every entry carries a monotonic last-update timestamp so the reaper can
-    find tasks stuck in a non-final status past TTL (P1-5) and TTL-cleanup
-    can forget final entries (P1-11).
+    find tasks stuck in a non-final status past TTL and TTL-cleanup
+    can forget final entries.
     """
 
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:

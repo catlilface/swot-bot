@@ -1,0 +1,220 @@
+# swot-bot full stack — self-hosted everything.
+#
+# Same as docker-compose.slim.yml plus two in-stack AI services:
+#   asr-service  = hwdsl2/whisper-server — faster-whisper, OpenAI-compatible
+#                  POST /v1/audio/transcriptions (supports verbose_json)
+#   llm-service  = ollama/ollama — OpenAI-compatible POST /v1/chat/completions
+#
+# Both models are chosen in .env:
+#   ASR_MODEL             whisper model: tiny / base / small / medium / large-v3-turbo (default: small, ~464 MB)
+#   ASR_DEVICE            cpu (default) | cuda — for cuda use the :cuda image tag (ASR_IMAGE_TAG=cuda)
+#   LLM_OLLAMA_MODEL      any model from the ollama library (default: qwen2.5:7b, ~4.7 GB)
+#
+# First start downloads the models (whisper from HuggingFace, ollama from
+# ollama.com) — until they finish, asr-service / llm-service stay unhealthy.
+#
+# The transcriber and analyzer are PINNED below to the in-stack endpoints
+# (compose `environment` overrides the same variables from `env_file`), so
+# this stack works even if .env still points them at external services.
+#
+# Telegram is still EXTERNAL: a real TELEGRAM__TOKEN is required in .env.
+#
+# Usage:
+#   cp .env.example .env          # then set TELEGRAM__TOKEN (and model names)
+#   docker compose -f docker-compose.full.yml up -d
+#
+# GPU:
+#   ASR:  ASR_DEVICE=cuda + ASR_IMAGE_TAG=cuda in .env (hwdsl2/whisper-server:cuda)
+#   LLM:  uncomment the `deploy` block in llm-service (needs the NVIDIA container toolkit)
+
+name: swot-bot
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: swot_rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI (guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [swot]
+
+  asr-service:
+    image: "hwdsl2/whisper-server:${ASR_IMAGE_TAG:-latest}"
+    container_name: swot_asr
+    environment:
+      WHISPER_PORT: "8000"
+      WHISPER_MODEL: ${ASR_MODEL:-small}
+      WHISPER_DEVICE: ${ASR_DEVICE:-cpu}
+      # Fixed key: matches TRANSCRIBER__API_KEY below (server would otherwise
+      # generate a random key on first start).
+      WHISPER_API_KEY: "none"
+      WHISPER_THREADS: "2"
+    volumes:
+      - asr_models:/var/lib/whisper  # model cache (survives container restarts)
+    # /health returns only after the model is downloaded and loaded.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 60  # first start downloads the model (up to ~10 min)
+      start_period: 30s
+    networks: [swot]
+    restart: unless-stopped
+
+  llm-service:
+    image: ollama/ollama:latest
+    container_name: swot_llm
+    environment:
+      # Ollama pulls this model on startup if it is not cached.
+      OLLAMA_MODELS: ${LLM_OLLAMA_MODEL:-qwen2.5:7b}
+    volumes:
+      - llm_models:/root/.ollama  # model cache
+    # API is up before the model pull finishes; until then LLM requests fail
+    # with "model not found" (the analyzer retries the whole job).
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+    # To use the GPU (needs the NVIDIA container toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    # To also use it from the host (e.g. with open-webui):
+    # ports:
+    #   - "11434:11434"
+
+  bot:
+    build:
+      context: .
+      dockerfile: .docker/bot/Dockerfile
+    image: swot-bot/bot:dev
+    container_name: swot_bot
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    # Reads summary.json + transcript.srt from the shared artifacts volume
+    # to deliver the final result to Telegram.
+    volumes:
+      - swot_artifacts:/artifacts
+    command: ["python", "-m", "swot_bot"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  downloader:
+    build:
+      context: .
+      dockerfile: .docker/downloader/Dockerfile
+    image: swot-bot/downloader:dev
+    container_name: swot_downloader
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: ["python", "-m", "swot_downloader"]
+    volumes:
+      - swot_media:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  transcriber:
+    build:
+      context: .
+      dockerfile: .docker/transcriber/Dockerfile
+    image: swot-bot/transcriber:dev
+    container_name: swot_transcriber
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      asr-service:
+        condition: service_healthy
+    env_file:
+      - .env
+    # full: in-stack whisper-server (see asr-service above).
+    environment:
+      TRANSCRIBER__API_URL: "http://asr-service:8000/v1"
+      TRANSCRIBER__API_KEY: "none"
+      TRANSCRIBER__MODEL: ${ASR_MODEL:-small}
+    command: ["python", "-m", "swot_transcriber"]
+    volumes:
+      - swot_media:/data
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: .docker/analyzer/Dockerfile
+    image: swot-bot/analyzer:dev
+    container_name: swot_analyzer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      llm-service:
+        condition: service_healthy
+    env_file:
+      - .env
+    # full: in-stack ollama (see llm-service above).
+    # Ollama's OpenAI-compatible API accepts any value for the API key.
+    environment:
+      LLM__API_URL: "http://llm-service:11434/v1"
+      LLM__API_KEY: "none"
+      LLM__MODEL_ID: ${LLM_OLLAMA_MODEL:-qwen2.5:7b}
+    command: ["python", "-m", "swot_analyzer"]
+    volumes:
+      - swot_artifacts:/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [swot]
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+  swot_media:
+  swot_artifacts:
+  asr_models:
+  llm_models:
+
+networks:
+  swot:
+    driver: bridge

@@ -27,8 +27,10 @@ def _fmt_srt_time(seconds: float) -> str:
 class OpenaiAsrTranscriber:
     """Transcribe via an OpenAI-compatible endpoint (POST /v1/audio/transcriptions).
 
-    Each chunk is one ``verbose_json`` call (bounded upload size, bounded
-    ``timeout``); the per-chunk segment timings are shifted to global
+    Each chunk is one call (bounded upload size, bounded ``timeout``); the
+    ``response_format`` is configurable (``json`` for maximum compatibility —
+    OpenAI, OpenRouter, whisper-server; ``verbose_json`` where supported for
+    per-segment timings). Per-chunk segment timings are shifted to global
     timestamps and merged into ``transcript.srt`` + ``segments.json``.
     """
 
@@ -43,6 +45,7 @@ class OpenaiAsrTranscriber:
         segment_duration_sec: int = 600,
         max_audio_mb: int = 512,
         timeout_sec: int = 300,
+        response_format: str = "json",
     ) -> None:
         self._client = client or AsyncOpenAI(
             base_url=base_url, api_key=api_key or "none"
@@ -53,6 +56,7 @@ class OpenaiAsrTranscriber:
         self._segment_duration_sec = segment_duration_sec
         self._max_audio_bytes = max_audio_mb * 1024 * 1024
         self._timeout_sec = timeout_sec
+        self._response_format = response_format
 
     async def transcribe(self, audio_path: Path, out_dir: Path) -> TranscriptResult:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -70,12 +74,17 @@ class OpenaiAsrTranscriber:
                 result = await self._client.audio.transcriptions.create(  # type: ignore[call-overload]  # stubs openai не принимают кортеж file вместе с verbose_json (рабочая форма API)
                     model=self._model,
                     file=(chunk.name, f, "audio/wav"),
-                    response_format="verbose_json",
+                    response_format=self._response_format,
                     language=self._language or None,
                     timeout=self._timeout_sec,
                 )
             language = getattr(result, "language", "") or language
-            records.extend(_shift_records(_records_from_result(result), offset))
+            records.extend(
+                _shift_records(
+                    _records_from_result(result, self._segment_duration_sec),
+                    offset,
+                )
+            )
 
         srt_path = out_dir / "transcript.srt"
         segments_path = out_dir / "segments.json"
@@ -104,8 +113,13 @@ class OpenaiAsrTranscriber:
         )
 
 
-def _records_from_result(result: Any) -> list[dict]:
-    """Segment records (chunk-local times) from a verbose_json transcription."""
+def _records_from_result(result: Any, default_end: float) -> list[dict]:
+    """Segment records (chunk-local times) from a transcription result.
+
+    ``verbose_json`` gives per-segment timings; ``json`` returns only the text
+    (no ``segments``/``duration``), so we emit a single cue for the whole
+    chunk, ending at ``default_end`` (the nominal chunk length).
+    """
     records = [
         {
             "start": round(float(seg.start), 2),
@@ -118,8 +132,14 @@ def _records_from_result(result: Any) -> list[dict]:
         # Endpoint did not return segments: single cue for the whole chunk.
         text = str(getattr(result, "text", "") or "").strip()
         if text:
-            end = float(getattr(result, "duration", 0.0) or 0.0)
-            records = [{"start": 0.0, "end": round(end, 2), "text": text}]
+            duration = float(getattr(result, "duration", 0.0) or 0.0)
+            records = [
+                {
+                    "start": 0.0,
+                    "end": round(duration or default_end, 2),
+                    "text": text,
+                }
+            ]
     return records
 
 

@@ -45,9 +45,6 @@ class LlmSummarizer:
         if llm is not None:
             self._model = llm
         else:
-            # T-2.9: ALL configured sampling parameters reach the model —
-            # not only temperature. The explicit max_tokens default can be
-            # overridden by sampling_parameters["max_tokens"].
             params: dict[str, Any] = dict(sampling_parameters or {})
             params.setdefault("max_tokens", max_tokens)
             self._model = ChatOpenAI(  # type: ignore[call-arg]  # stubs of langchain_openai lag the runtime API (max_tokens/request_timeout)
